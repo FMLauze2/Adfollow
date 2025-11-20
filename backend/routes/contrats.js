@@ -41,7 +41,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// DELETE contrat
+// DELETE contrats
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
