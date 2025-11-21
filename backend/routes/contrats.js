@@ -1,3 +1,4 @@
+// backend/routes/contrats.js
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
@@ -9,20 +10,46 @@ router.get('/', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error(err.message);
+    res.status(500).send('Erreur lors de la récupération des contrats');
   }
 });
 
-// POST new contrat
-router.post('/', async (req, res) => {
+// GET contrat by ID
+router.get('/:id', async (req, res) => {
   try {
-    const { cabinet_id, date_envoi, date_reception, statut, notes } = req.body;
-    const result = await pool.query(
-      'INSERT INTO contrats (cabinet_id, date_envoi, date_reception, statut, notes) VALUES ($1,$2,$3,$4,$5) RETURNING *',
-      [cabinet_id, date_envoi, date_reception, statut, notes]
-    );
+    const { id } = req.params;
+    const result = await pool.query('SELECT * FROM contrats WHERE id_contrat = $1', [id]);
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err.message);
+    res.status(500).send('Erreur lors de la récupération du contrat');
+  }
+});
+
+// POST create new contrat
+router.post('/', async (req, res) => {
+  try {
+    let { cabinet, adresse, code_postal, ville, praticiens, prix, date_envoi, date_reception } = req.body;
+
+    // Convertir praticiens en JSON si ce n'est pas déjà
+    if (!Array.isArray(praticiens)) {
+      try {
+        praticiens = JSON.parse(praticiens);
+      } catch (err) {
+        return res.status(400).json({ message: 'Champ praticiens invalide. Doit être un tableau JSON.' });
+      }
+    }
+
+    const result = await pool.query(
+      `INSERT INTO contrats (cabinet, adresse, code_postal, ville, praticiens, prix, date_envoi, date_reception, date_creation)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW()) RETURNING *`,
+      [cabinet, adresse, code_postal, ville, JSON.stringify(praticiens), prix, date_envoi || null, date_reception || null]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ message: 'Erreur lors de la création du contrat' });
   }
 });
 
@@ -30,25 +57,41 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { cabinet_id, date_envoi, date_reception, statut, notes } = req.body;
+    const {
+      cabinet,
+      adresse,
+      code_postal,
+      ville,
+      praticiens,
+      prix,
+      date_envoi,
+      date_reception
+    } = req.body;
+
     const result = await pool.query(
-      'UPDATE contrats SET cabinet_id=$1, date_envoi=$2, date_reception=$3, statut=$4, notes=$5 WHERE id_contrat=$6 RETURNING *',
-      [cabinet_id, date_envoi, date_reception, statut, notes, id]
+      `UPDATE contrats
+       SET cabinet=$1, adresse=$2, code_postal=$3, ville=$4, praticiens=$5, prix=$6, date_envoi=$7, date_reception=$8
+       WHERE id_contrat=$9
+       RETURNING *`,
+      [cabinet, adresse, code_postal, ville, praticiens, prix, date_envoi || null, date_reception || null, id]
     );
-    res.json(result.rows[0]);
+
+    res.json({ message: 'Contrat mis à jour', contrat: result.rows[0] });
   } catch (err) {
     console.error(err.message);
+    res.status(500).send('Erreur lors de la mise à jour du contrat');
   }
 });
 
-// DELETE contrats
+// DELETE contrat
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     await pool.query('DELETE FROM contrats WHERE id_contrat=$1', [id]);
-    res.json({ message: 'Contrat deleted' });
+    res.json({ message: 'Contrat supprimé' });
   } catch (err) {
     console.error(err.message);
+    res.status(500).send('Erreur lors de la suppression du contrat');
   }
 });
 
