@@ -1,12 +1,15 @@
 const { Pool } = require('pg');
-require('dotenv').config();
 
 const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'adfollow',
-  password: process.env.DB_PASSWORD || 'postgre',
-  port: process.env.DB_PORT || 5433,
+  host: 'localhost',
+  port: 5433,
+  user: 'postgres',
+  password: 'postgre',
+  database: 'adfollow',
 });
+
+pool.connect()
+  .then(() => console.log('Connected to PostgreSQL (adfollow)'))
+  .catch(err => console.error('Connection error:', err.stack));
 
 module.exports = pool;
