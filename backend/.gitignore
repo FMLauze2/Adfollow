@@ -1,0 +1,16 @@
+# Node modules
+node_modules/
+
+# PDF générés
+services/uploads/
+services/uploads/contrats/
+
+# Logs
+logs/
+*.log
+
+# Variables d'environnement
+.env
+
+# Build temp files
+tmp/
