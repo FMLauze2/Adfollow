@@ -8,6 +8,7 @@ import Navbar from "./components/Navbar";
 import ContratsPage from "./pages/ContratsPage";
 import InstallationsPage from "./pages/InstallationsPage";
 import PraticiensPage from "./pages/PraticiensPage";
+import ContratsSuiviPage from "./pages/ContratsSuiviPage";
 
 function App() {
   return (    
@@ -16,6 +17,7 @@ function App() {
       <div style={{ padding: "20px" }}>
         <Routes>
           <Route path="/" element={<ContratsPage />} />
+          <Route path="/suivi-contrats" element={<ContratsSuiviPage />} />
           <Route path="/installations" element={<InstallationsPage />} />
           <Route path="/praticiens" element={<PraticiensPage />} />
         </Routes>
