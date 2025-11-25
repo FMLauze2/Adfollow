@@ -53,33 +53,25 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT update contrat
+// PUT /api/contrats/:id
 router.put('/:id', async (req, res) => {
+  const { id } = req.params;
+  const { date_envoi, date_reception } = req.body;
+
+  // Vérification simple
+  if (!id) return res.status(400).json({ error: 'id manquant' });
+
   try {
-    const { id } = req.params;
-    const {
-      cabinet,
-      adresse,
-      code_postal,
-      ville,
-      praticiens,
-      prix,
-      date_envoi,
-      date_reception
-    } = req.body;
-
-    const result = await pool.query(
+    await pool.query(
       `UPDATE contrats
-       SET cabinet=$1, adresse=$2, code_postal=$3, ville=$4, praticiens=$5, prix=$6, date_envoi=$7, date_reception=$8
-       WHERE id_contrat=$9
-       RETURNING *`,
-      [cabinet, adresse, code_postal, ville, praticiens, prix, date_envoi || null, date_reception || null, id]
+       SET date_envoi = $1, date_reception = $2
+       WHERE id_contrat = $3`,
+      [date_envoi || null, date_reception || null, id]
     );
-
-    res.json({ message: 'Contrat mis à jour', contrat: result.rows[0] });
+    res.json({ message: 'Contrat mis à jour' });
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Erreur lors de la mise à jour du contrat');
+    console.error('Erreur update contrat:', err);
+    res.status(500).json({ error: 'Erreur lors de la mise à jour du contrat' });
   }
 });
 

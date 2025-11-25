@@ -6,9 +6,10 @@ const Navbar = () => {
     <nav style={styles.nav}>
       <h2 style={styles.logo}>AdFollow</h2>
       <div style={styles.links}>
-        <Link style={styles.link} to="/">Contrats</Link>
-        <Link style={styles.link} to="/installations">Installations</Link>
+        <Link style={styles.link} to="/suivi-contrats">Contrats</Link>
         <Link style={styles.link} to="/praticiens">Praticiens</Link>
+        <Link style={styles.link} to="/installations">Installations</Link>
+        <Link style={styles.link} to="/praticiens">Praticiens</Link>        
       </div>
     </nav>
   );
