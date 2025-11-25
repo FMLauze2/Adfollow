@@ -2,6 +2,9 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const { generateContratPDF } = require('../services/pdf/generateContratPDF');
+
+
 
 // GET all contrats
 router.get('/', async (req, res) => {
@@ -14,44 +17,56 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET contrat by ID
-router.get('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await pool.query('SELECT * FROM contrats WHERE id_contrat = $1', [id]);
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Erreur lors de la récupération du contrat');
-  }
-});
-
-// POST create new contrat
-router.post('/', async (req, res) => {
-  try {
-    let { cabinet, adresse, code_postal, ville, praticiens, prix, date_envoi, date_reception } = req.body;
-
-    // Convertir praticiens en JSON si ce n'est pas déjà
-    if (!Array.isArray(praticiens)) {
-      try {
-        praticiens = JSON.parse(praticiens);
-      } catch (err) {
-        return res.status(400).json({ message: 'Champ praticiens invalide. Doit être un tableau JSON.' });
-      }
+  // GET contrat by ID
+  router.get('/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await pool.query('SELECT * FROM contrats WHERE id_contrat = $1', [id]);
+      res.json(result.rows[0]);
+    } catch (err) {
+      console.error(err.message);
+      res.status(500).send('Erreur lors de la récupération du contrat');
     }
+  });
 
-    const result = await pool.query(
-      `INSERT INTO contrats (cabinet, adresse, code_postal, ville, praticiens, prix, date_envoi, date_reception, date_creation)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW()) RETURNING *`,
-      [cabinet, adresse, code_postal, ville, JSON.stringify(praticiens), prix, date_envoi || null, date_reception || null]
-    );
+    // POST create new contrat
+  router.post('/', async (req, res) => {
+    try {
+      let { cabinet, adresse, code_postal, ville, praticiens, prix, date_envoi, date_reception } = req.body;
 
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ message: 'Erreur lors de la création du contrat' });
-  }
-});
+      // Convertir praticiens en JSON si ce n'est pas déjà
+      if (!Array.isArray(praticiens)) {
+        try {
+          praticiens = JSON.parse(praticiens);
+        } catch (err) {
+          return res.status(400).json({ message: 'Champ praticiens invalide. Doit être un tableau JSON.' });
+        }
+      }
+
+      // Insertion du contrat
+      const result = await pool.query(
+        `INSERT INTO contrats (cabinet, adresse, code_postal, ville, praticiens, prix, date_envoi, date_reception, date_creation)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW()) RETURNING *`,
+        [cabinet, adresse, code_postal, ville, JSON.stringify(praticiens), prix, date_envoi || null, date_reception || null]
+      );
+
+      const contratCree = result.rows[0];
+
+      // Génération du PDF
+      try {
+        const pdfPath = await generateContratPDF(contratCree);
+        contratCree.pdf_path = pdfPath; // on peut stocker le chemin dans la réponse
+      } catch (pdfErr) {
+        console.error('Erreur génération PDF:', pdfErr);
+        // On continue quand même, PDF non critique
+      }
+
+      res.json(contratCree);
+    } catch (err) {
+      console.error(err.message);
+      res.status(500).json({ message: 'Erreur lors de la création du contrat' });
+    }
+  });
 
 
 

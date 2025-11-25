@@ -1,9 +1,9 @@
-import fs from 'fs';
-import { PDFDocument } from 'pdf-lib';
-import path from 'path';
+const fs = require('fs');
+const path = require('path');
+const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
 
-export const generateContratPDF = async (contrat) => {
-  const templatePath = path.join(__dirname, '..', 'templates', 'contrat_template.pdf');
+async function generateContratPDF(contrat) {
+    const templatePath = path.join(__dirname, 'templates', 'modele_contrat.pdf');
   const pdfBytes = fs.readFileSync(templatePath);
 
   const pdfDoc = await PDFDocument.load(pdfBytes);
@@ -54,3 +54,5 @@ export const generateContratPDF = async (contrat) => {
 
   return outputPath;
 };
+
+module.exports = { generateContratPDF };
