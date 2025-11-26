@@ -1,58 +1,54 @@
 const fs = require('fs');
 const path = require('path');
-const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
+const puppeteer = require('puppeteer');
+const { generateContratPDFHTML } = require('./generateContratPDFHTML');
 
 async function generateContratPDF(contrat) {
-    const templatePath = path.join(__dirname, 'templates', 'modele_contrat.pdf');
-  const pdfBytes = fs.readFileSync(templatePath);
+  try {
+    // Générer le HTML
+    const htmlContent = await generateContratPDFHTML(contrat);
 
-  const pdfDoc = await PDFDocument.load(pdfBytes);
+    // Lancer Puppeteer
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
 
-  // Calcul des dates
-  const dateDebut = new Date(contrat.date_envoi || new Date());
-  const dateFin = new Date(dateDebut);
-  dateFin.setFullYear(dateDebut.getFullYear() + 1);
+    const page = await browser.newPage();
+    
+    // Charger le contenu HTML
+    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
 
-  // Texte à insérer
-  const textes = {
-    NOMBREPRATICIEN: contrat.praticiens.length.toString(),
-    PRIX: (contrat.prix || 46).toString(),
-    NOMCABINET: contrat.cabinet,
-    ADRESSECABINET: contrat.adresse,
-    CPCABINET: contrat.code_postal,
-    VILLECABINET: contrat.ville,
-    LISTEPRATICIENS: contrat.praticiens.join(', '),
-    DATEDEBUT: dateDebut.toLocaleDateString(),
-    DATEFIN: dateFin.toLocaleDateString(),
-    DATEREALISATION: dateDebut.toLocaleDateString(),
-  };
-
-  // Récupération des champs du formulaire (AcroForm)
-  const form = pdfDoc.getForm();
-
-  // Pour chaque balise, on suppose qu'il y a un champ du même nom dans le PDF
-  Object.entries(textes).forEach(([key, value]) => {
-    try {
-      const field = form.getTextField(key); // doit correspondre au nom du champ dans le PDF
-      field.setText(value);
-    } catch (err) {
-      console.warn(`Champ "${key}" introuvable dans le PDF.`);
+    // Créer le dossier de destination s'il n'existe pas
+    const outputDir = path.join(__dirname, 'uploads', 'contrats');
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
     }
-  });
 
-  // On peut aussi "aplatir" le formulaire pour que le texte devienne fixe
-  form.flatten();
+    // Générer le PDF
+    const outputPath = path.join(outputDir, `contrat_${contrat.id_contrat}.pdf`);
+    await page.pdf({
+      path: outputPath,
+      format: 'A4',
+      margin: {
+        top: '5mm',
+        right: '5mm',
+        bottom: '5mm',
+        left: '5mm'
+      },
+      printBackground: true,
+      displayHeaderFooter: false
+    });
 
-  const pdfBytesFinal = await pdfDoc.save();
+    await browser.close();
 
-  // Sauvegarde
-  const outputDir = path.join(__dirname, 'uploads', 'contrats');
-  if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+    console.log(`PDF généré: ${outputPath}`);
+    return outputPath;
 
-  const outputPath = path.join(outputDir, `contrat_${contrat.id_contrat}.pdf`);
-  fs.writeFileSync(outputPath, pdfBytesFinal);
-
-  return outputPath;
-};
+  } catch (err) {
+    console.error('Erreur lors de la génération du PDF:', err);
+    throw err;
+  }
+}
 
 module.exports = { generateContratPDF };
