@@ -2,8 +2,9 @@
 node_modules/
 
 # PDF générés
-services/uploads/
-services/uploads/contrats/
+services/
+/services/pdf/uploads/
+/services/pdf/uploads/contrats/
 
 # Logs
 logs/
