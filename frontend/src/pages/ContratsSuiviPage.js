@@ -26,6 +26,7 @@ const ContratsSuiviPage = () => {
   const [praticienInput, setPraticienInput] = useState("");
   const [emailModalContrat, setEmailModalContrat] = useState(null);
   const [copiedEmail, setCopiedEmail] = useState(false);
+  const [updatingDates, setUpdatingDates] = useState({});
   // Apply deep-link filters from URL on first load
   useEffect(() => {
     try {
@@ -138,6 +139,8 @@ const ContratsSuiviPage = () => {
       date_reception = date_reception.split("T")[0];
     }
 
+    setUpdatingDates(prev => ({ ...prev, [id]: true }));
+
     try {
       await axios.put(`http://localhost:4000/api/contrats/${id}`, {
         date_envoi,
@@ -148,6 +151,8 @@ const ContratsSuiviPage = () => {
     } catch (err) {
       console.error("Erreur update contrat:", err);
       alert("Erreur lors de la mise à jour");
+    } finally {
+      setUpdatingDates(prev => ({ ...prev, [id]: false }));
     }
   };
 
@@ -264,6 +269,29 @@ const ContratsSuiviPage = () => {
   const generateEmailText = (contrat) => {
     const cabinetSafe = contrat.cabinet.replace(/[^a-z0-9_\-\s]/gi, '').replace(/\s+/g, '_');
     const pdfFilename = `Contrat_de_services_${cabinetSafe}.pdf`;
+    
+    // Vérifier si le contrat est en retard
+    const isOverdue = contrat.statut === 'Envoyé' && !contrat.date_reception && contrat.date_envoi;
+    const daysSinceEnvoi = isOverdue 
+      ? Math.floor((Date.now() - new Date(contrat.date_envoi).getTime()) / (1000*60*60*24))
+      : 0;
+    const isLate = isOverdue && daysSinceEnvoi > overdueDays;
+    
+    if (isLate) {
+      return `Bonjour,
+
+Je me permets de vous relancer concernant le contrat de services pour ${contrat.cabinet} que je vous ai envoyé il y a ${daysSinceEnvoi} jours.
+
+À ce jour, je n'ai pas encore reçu le contrat signé et tamponné.
+
+Pour rappel, voici les informations du contrat :
+- Cabinet : ${contrat.cabinet}
+- Adresse : ${contrat.adresse}, ${contrat.code_postal} ${contrat.ville}
+- Praticiens : ${contrat.praticiens.join(', ')}
+- Montant : ${contrat.prix}€
+
+Merci de me retourner le contrat signé et tamponné par email dans les meilleurs délais.`;
+    }
     
     return `Bonjour,
 
@@ -604,9 +632,14 @@ Merci de nous retourner le contrat signé et tamponné par email.`;
                       e.stopPropagation();
                       updateDates(c.id_contrat);
                     }}
-                    className="w-full mt-2 bg-blue-500 hover:bg-blue-600 text-white font-medium py-1 rounded text-xs"
+                    disabled={updatingDates[c.id_contrat]}
+                    className={`w-full mt-2 font-medium py-1 rounded text-xs ${
+                      updatingDates[c.id_contrat]
+                        ? 'bg-gray-400 cursor-not-allowed'
+                        : 'bg-blue-500 hover:bg-blue-600 text-white'
+                    }`}
                   >
-                    Mettre à jour
+                    {updatingDates[c.id_contrat] ? '⏳ Mise à jour...' : 'Mettre à jour'}
                   </button>
                 </div>
               ))}
