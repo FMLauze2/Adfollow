@@ -24,6 +24,19 @@ const ContratsSuiviPage = () => {
     prix: ""
   });
   const [praticienInput, setPraticienInput] = useState("");
+  // Apply deep-link filters from URL on first load
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('overdue') === '1') setShowOverdueOnly(true);
+      const days = parseInt(params.get('days'), 10);
+      if (!isNaN(days) && days > 0) setOverdueDays(days);
+      const s = params.get('statut');
+      if (s && ["Tous","Brouillon","Envoyé","Reçu"].includes(s)) setStatusFilter(s);
+      const q = params.get('q');
+      if (q) setSearchTerm(q);
+    } catch {}
+  }, []);
 
   const fetchContrats = async () => {
     try {
