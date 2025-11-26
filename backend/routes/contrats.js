@@ -97,8 +97,25 @@ router.delete('/:id', async (req, res) => {
   const contratId = req.params.id;
 
   try {
-    // On supprime le contrat dans la base
-    await pool.query('DELETE FROM contrats WHERE id = $1', [contratId]);
+    // Supprimer le PDF associé (récupérer le nom du cabinet depuis la DB)
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Récupérer le contrat pour avoir le nom du cabinet
+    const contratResult = await pool.query('SELECT cabinet FROM contrats WHERE id_contrat = $1', [contratId]);
+    if (contratResult.rows.length > 0) {
+      const cabinet = contratResult.rows[0].cabinet;
+      const cabinetSafe = cabinet.replace(/[^a-z0-9_\-\s]/gi, '').replace(/\s+/g, '_');
+      const pdfPath = path.join(__dirname, '..', 'services', 'pdf', 'uploads', 'contrats', `Contrat_de_services_${cabinetSafe}.pdf`);
+      
+      if (fs.existsSync(pdfPath)) {
+        fs.unlinkSync(pdfPath);
+        console.log(`PDF supprimé: ${pdfPath}`);
+      }
+    }
+
+    // Supprimer le contrat dans la base
+    await pool.query('DELETE FROM contrats WHERE id_contrat = $1', [contratId]);
 
     res.status(200).json({ message: 'Contrat supprimé avec succès' });
   } catch (error) {

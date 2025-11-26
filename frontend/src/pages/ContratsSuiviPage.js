@@ -47,7 +47,18 @@ const ContratsSuiviPage = () => {
         return;
       }
       setCheckingPdf(true);
-      const url = `http://localhost:4000/uploads/contrats/contrat_${selectedContratId}.pdf`;
+      
+      // Construire le nom du fichier avec le nom du cabinet
+      const contrat = contrats.find(c => c.id_contrat === selectedContratId);
+      if (!contrat) {
+        setPdfAvailable(false);
+        setCheckingPdf(false);
+        return;
+      }
+      
+      const cabinetSafe = contrat.cabinet.replace(/[^a-z0-9_\-\s]/gi, '').replace(/\s+/g, '_');
+      const url = `http://localhost:4000/uploads/contrats/Contrat_de_services_${cabinetSafe}.pdf`;
+      
       try {
         await axios.head(url);
         setPdfAvailable(true);
@@ -58,7 +69,7 @@ const ContratsSuiviPage = () => {
       }
     };
     checkPdf();
-  }, [selectedContratId]);
+  }, [selectedContratId, contrats]);
 
   // 🔥 SUPPRESSION D'UN CONTRAT
   const handleDelete = async (id) => {
@@ -263,7 +274,7 @@ const ContratsSuiviPage = () => {
                   ) : pdfAvailable ? (
                     <iframe
                       key={selectedContratId}
-                      src={`http://localhost:4000/uploads/contrats/contrat_${selectedContrat.id_contrat}.pdf`}
+                      src={`http://localhost:4000/uploads/contrats/Contrat_de_services_${selectedContrat.cabinet.replace(/[^a-z0-9_\-\s]/gi, '').replace(/\s+/g, '_')}.pdf`}
                       title={`PDF ${selectedContrat.cabinet}`}
                       className="w-full h-full"
                       style={{ border: "none" }}
@@ -278,7 +289,7 @@ const ContratsSuiviPage = () => {
                 </div>
 
                 <a
-                  href={`http://localhost:4000/uploads/contrats/contrat_${selectedContrat.id_contrat}.pdf`}
+                  href={`http://localhost:4000/uploads/contrats/Contrat_de_services_${selectedContrat.cabinet.replace(/[^a-z0-9_\-\s]/gi, '').replace(/\s+/g, '_')}.pdf`}
                   download
                   className="mt-4 block w-full bg-green-500 hover:bg-green-600 text-white font-medium py-2 rounded text-center"
                 >

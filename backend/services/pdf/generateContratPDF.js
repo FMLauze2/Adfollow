@@ -8,6 +8,17 @@ async function generateContratPDF(contrat) {
     // Générer le HTML
     const htmlContent = await generateContratPDFHTML(contrat);
 
+    // Pour debug : écrire le HTML généré dans un fichier afin de vérifier l'image
+    try {
+      const debugDir = path.join(__dirname, 'uploads', 'contrats', 'debug');
+      if (!fs.existsSync(debugDir)) fs.mkdirSync(debugDir, { recursive: true });
+      const debugHtmlPath = path.join(debugDir, `contrat_${contrat.id_contrat}.html`);
+      fs.writeFileSync(debugHtmlPath, htmlContent, 'utf8');
+      console.log(`DEBUG HTML écrit: ${debugHtmlPath}`);
+    } catch (e) {
+      console.warn('Impossible d\'écrire le debug HTML:', e.message);
+    }
+
     // Lancer Puppeteer
     const browser = await puppeteer.launch({
       headless: true,
@@ -15,9 +26,30 @@ async function generateContratPDF(contrat) {
     });
 
     const page = await browser.newPage();
-    
+
     // Charger le contenu HTML
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+
+    // Emuler le média d'impression pour que les règles @media print soient prises en compte
+    try {
+      await page.emulateMediaType('print');
+    } catch (e) {
+      // ignore si non supporté
+    }
+
+    // Petit délai pour s'assurer que tout est rendu (images/data-URI, polices, etc.)
+    await new Promise(resolve => setTimeout(resolve, 250));
+
+    // Écrire une capture d'écran de debug pour vérifier le rendu dans Chromium
+    try {
+      const debugDir = path.join(__dirname, 'uploads', 'contrats', 'debug');
+      if (!fs.existsSync(debugDir)) fs.mkdirSync(debugDir, { recursive: true });
+      const screenshotPath = path.join(debugDir, `contrat_${contrat.id_contrat}_screenshot.png`);
+      await page.screenshot({ path: screenshotPath, fullPage: true });
+      console.log(`DEBUG screenshot écrit: ${screenshotPath}`);
+    } catch (e) {
+      console.warn('Impossible d\'écrire le screenshot de debug:', e.message);
+    }
 
     // Créer le dossier de destination s'il n'existe pas
     const outputDir = path.join(__dirname, 'uploads', 'contrats');
@@ -25,8 +57,9 @@ async function generateContratPDF(contrat) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
-    // Générer le PDF
-    const outputPath = path.join(outputDir, `contrat_${contrat.id_contrat}.pdf`);
+    // Générer le PDF avec nom du cabinet (sanitize pour éviter caractères invalides)
+    const cabinetSafe = contrat.cabinet.replace(/[^a-z0-9_\-\s]/gi, '').replace(/\s+/g, '_');
+    const outputPath = path.join(outputDir, `Contrat_de_services_${cabinetSafe}.pdf`);
     await page.pdf({
       path: outputPath,
       format: 'A4',
@@ -37,7 +70,8 @@ async function generateContratPDF(contrat) {
         left: '5mm'
       },
       printBackground: true,
-      displayHeaderFooter: false
+      displayHeaderFooter: false,
+      title: `Contrat de services ${contrat.cabinet}`
     });
 
     await browser.close();
