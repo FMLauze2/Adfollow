@@ -1,10 +1,16 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Servir les fichiers statiques (PDF)
+const uploadsPath = path.resolve(__dirname, 'services/pdf/uploads');
+console.log('Serving static files from:', uploadsPath);
+app.use('/uploads', express.static(uploadsPath));
 
 // Import routes
 const cabinetRoutes = require('./routes/cabinets');
