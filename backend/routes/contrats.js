@@ -92,16 +92,20 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// DELETE contrat
+// DELETE /api/contrats/:id - supprimer un contrat
 router.delete('/:id', async (req, res) => {
+  const contratId = req.params.id;
+
   try {
-    const { id } = req.params;
-    await pool.query('DELETE FROM contrats WHERE id_contrat=$1', [id]);
-    res.json({ message: 'Contrat supprimé' });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Erreur lors de la suppression du contrat');
+    // On supprime le contrat dans la base
+    await pool.query('DELETE FROM contrats WHERE id = $1', [contratId]);
+
+    res.status(200).json({ message: 'Contrat supprimé avec succès' });
+  } catch (error) {
+    console.error('Erreur suppression contrat :', error);
+    res.status(500).json({ error: 'Erreur lors de la suppression du contrat' });
   }
 });
+
 
 module.exports = router;

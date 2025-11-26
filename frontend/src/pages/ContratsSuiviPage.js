@@ -4,22 +4,18 @@ import axios from "axios";
 const ContratsSuiviPage = () => {
   const [contrats, setContrats] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [dates, setDates] = useState({}); // state pour toutes les dates
+  const [dates, setDates] = useState({});
 
   const fetchContrats = async () => {
     try {
       const res = await axios.get("http://localhost:4000/api/contrats");
       setContrats(res.data);
 
-      // LOG pour confirmer le vrai nom du champ
-      console.log("Contrats reçus :", res.data);
-
-      // Initialisation correct avec id_contrat
       const initialDates = {};
       res.data.forEach((c) => {
         initialDates[c.id_contrat] = {
-          date_envoi: c.date_envoi || "",
-          date_reception: c.date_reception || "",
+          date_envoi: c.date_envoi ? c.date_envoi.split("T")[0] : "",
+          date_reception: c.date_reception ? c.date_reception.split("T")[0] : "",
         };
       });
       setDates(initialDates);
@@ -35,13 +31,37 @@ const ContratsSuiviPage = () => {
     fetchContrats();
   }, []);
 
-  const updateDates = async (id) => {
-    const date_envoi = dates[id]?.date_envoi || null;
-    const date_reception = dates[id]?.date_reception || null;
+  // 🔥 SUPPRESSION D’UN CONTRAT
+  const handleDelete = async (id) => {
+    if (!window.confirm("Supprimer définitivement ce contrat ?")) return;
 
-    if (!dates[id]) {
-      alert("Dates non définies !");
-      return;
+    try {
+      await axios.delete(`http://localhost:4000/api/contrats/${id}`);
+
+      // Mise à jour instantanée de la liste
+      setContrats((prev) => prev.filter((c) => c.id_contrat !== id));
+
+      // Retire les dates associées
+      const updatedDates = { ...dates };
+      delete updatedDates[id];
+      setDates(updatedDates);
+
+    } catch (err) {
+      console.error("Erreur suppression :", err);
+      alert("Impossible de supprimer le contrat.");
+    }
+  };
+
+  const updateDates = async (id) => {
+    let date_envoi = dates[id]?.date_envoi || null;
+    let date_reception = dates[id]?.date_reception || null;
+
+    // Convertir les dates ISO au format yyyy-MM-dd si nécessaire
+    if (date_envoi && date_envoi.includes("T")) {
+      date_envoi = date_envoi.split("T")[0];
+    }
+    if (date_reception && date_reception.includes("T")) {
+      date_reception = date_reception.split("T")[0];
     }
 
     try {
@@ -50,7 +70,7 @@ const ContratsSuiviPage = () => {
         date_reception,
       });
       alert("Dates mises à jour !");
-      fetchContrats(); // refresh
+      fetchContrats();
     } catch (err) {
       console.error("Erreur update contrat:", err);
       alert("Erreur lors de la mise à jour");
@@ -69,7 +89,18 @@ const ContratsSuiviPage = () => {
             key={c.id_contrat}
             className="bg-white p-4 rounded shadow border border-gray-200"
           >
-            <h2 className="text-lg font-semibold text-gray-900">{c.cabinet}</h2>
+            {/* TITRE + BOUTON SUPPRIMER */}
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-gray-900">{c.cabinet}</h2>
+
+              <button
+                onClick={() => handleDelete(c.id_contrat)}
+                className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded"
+              >
+                Supprimer
+              </button>
+            </div>
+
             <p className="text-sm text-gray-600">
               {c.adresse}, {c.code_postal} {c.ville}
             </p>
