@@ -27,6 +27,7 @@ const ContratsSuiviPage = () => {
   const [emailModalContrat, setEmailModalContrat] = useState(null);
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [updatingDates, setUpdatingDates] = useState({});
+  const [regeneratingPdf, setRegeneratingPdf] = useState({});
   // Apply deep-link filters from URL on first load
   useEffect(() => {
     try {
@@ -266,18 +267,17 @@ const ContratsSuiviPage = () => {
   }, 0);
 
   // Générer le texte email pour un contrat
-  const generateEmailText = (contrat) => {
+  const generateEmailText = (contrat, isRelance = false) => {
     const cabinetSafe = contrat.cabinet.replace(/[^a-z0-9_\-\s]/gi, '').replace(/\s+/g, '_');
     const pdfFilename = `Contrat_de_services_${cabinetSafe}.pdf`;
     
-    // Vérifier si le contrat est en retard
-    const isOverdue = contrat.statut === 'Envoyé' && !contrat.date_reception && contrat.date_envoi;
-    const daysSinceEnvoi = isOverdue 
+    // Calculer les jours depuis envoi
+    const hasDateEnvoi = contrat.statut === 'Envoyé' && !contrat.date_reception && contrat.date_envoi;
+    const daysSinceEnvoi = hasDateEnvoi 
       ? Math.floor((Date.now() - new Date(contrat.date_envoi).getTime()) / (1000*60*60*24))
       : 0;
-    const isLate = isOverdue && daysSinceEnvoi > overdueDays;
     
-    if (isLate) {
+    if (isRelance && hasDateEnvoi) {
       return `Bonjour,
 
 Je me permets de vous relancer concernant le contrat de services pour ${contrat.cabinet} que je vous ai envoyé il y a ${daysSinceEnvoi} jours.
@@ -306,13 +306,41 @@ Informations du contrat :
 Merci de nous retourner le contrat signé et tamponné par email.`;
   };
 
-  const copyEmailToClipboard = () => {
+  const copyEmailToClipboard = (isRelance = false) => {
     if (!emailModalContrat) return;
-    const text = generateEmailText(emailModalContrat);
+    const text = generateEmailText(emailModalContrat, isRelance);
     navigator.clipboard.writeText(text).then(() => {
       setCopiedEmail(true);
       setTimeout(() => setCopiedEmail(false), 2000);
     });
+  };
+
+  const regeneratePDF = async (contrat) => {
+    if (!window.confirm(`Régénérer le PDF pour ${contrat.cabinet} ?`)) return;
+    
+    setRegeneratingPdf(prev => ({ ...prev, [contrat.id_contrat]: true }));
+    
+    try {
+      // Appel PUT avec toutes les données existantes pour forcer la régénération
+      await axios.put(`http://localhost:4000/api/contrats/${contrat.id_contrat}`, {
+        cabinet: contrat.cabinet,
+        adresse: contrat.adresse,
+        code_postal: contrat.code_postal,
+        ville: contrat.ville,
+        praticiens: contrat.praticiens,
+        prix: contrat.prix,
+        date_envoi: contrat.date_envoi,
+        date_reception: contrat.date_reception
+      });
+      
+      alert("PDF régénéré avec succès !");
+      fetchContrats();
+    } catch (err) {
+      console.error("Erreur régénération PDF:", err);
+      alert("Erreur lors de la régénération du PDF");
+    } finally {
+      setRegeneratingPdf(prev => ({ ...prev, [contrat.id_contrat]: false }));
+    }
   };
 
   return (
@@ -550,6 +578,21 @@ Merci de nous retourner le contrat signé et tamponné par email.`;
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          regeneratePDF(c);
+                        }}
+                        disabled={regeneratingPdf[c.id_contrat]}
+                        className={`px-2 py-1 rounded text-xs ${
+                          regeneratingPdf[c.id_contrat]
+                            ? 'bg-gray-400 cursor-not-allowed text-white'
+                            : 'bg-purple-500 hover:bg-purple-600 text-white'
+                        }`}
+                        title="Régénérer PDF"
+                      >
+                        {regeneratingPdf[c.id_contrat] ? '⏳' : '🔄'}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setEmailModalContrat(c);
                         }}
                         className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs"
@@ -722,42 +765,78 @@ Merci de nous retourner le contrat signé et tamponné par email.`;
       </div>
 
       {/* MODAL EMAIL */}
-      {emailModalContrat && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">
-                📧 Texte email pour {emailModalContrat.cabinet}
-              </h2>
-              
-              <p className="text-sm text-gray-600 mb-3">
-                Copie le texte ci-dessous dans le corps de ton email.
-              </p>
+      {emailModalContrat && (() => {
+        const hasDateEnvoi = emailModalContrat.statut === 'Envoyé' && !emailModalContrat.date_reception && emailModalContrat.date_envoi;
+        const daysSinceEnvoi = hasDateEnvoi 
+          ? Math.floor((Date.now() - new Date(emailModalContrat.date_envoi).getTime()) / (1000*60*60*24))
+          : 0;
+        const isLate = hasDateEnvoi && daysSinceEnvoi > overdueDays;
+        
+        return (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <h2 className="text-xl font-bold text-gray-800 mb-4">
+                  📧 Texte email pour {emailModalContrat.cabinet}
+                </h2>
+                
+                {isLate && (
+                  <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded">
+                    <p className="text-sm text-orange-800 font-medium">
+                      ⚠️ Contrat envoyé il y a {daysSinceEnvoi} jours — Deux textes disponibles ci-dessous
+                    </p>
+                  </div>
+                )}
+                
+                <div className={isLate ? 'grid grid-cols-2 gap-4' : ''}>
+                  {/* Premier email ou email unique */}
+                  <div>
+                    {isLate && <h3 className="text-sm font-semibold text-gray-700 mb-2">📄 Premier envoi</h3>}
+                    <textarea
+                      readOnly
+                      value={generateEmailText(emailModalContrat, false)}
+                      className="w-full h-80 border border-gray-300 rounded px-3 py-2 text-sm font-mono bg-gray-50"
+                    />
+                    <button
+                      onClick={() => copyEmailToClipboard(false)}
+                      className="w-full mt-2 bg-green-500 hover:bg-green-600 text-white font-medium py-2 rounded text-sm"
+                    >
+                      {copiedEmail ? '✓ Copié !' : '📋 Copier ce texte'}
+                    </button>
+                  </div>
+                  
+                  {/* Email de relance si en retard */}
+                  {isLate && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-2">🔔 Relance ({daysSinceEnvoi}j)</h3>
+                      <textarea
+                        readOnly
+                        value={generateEmailText(emailModalContrat, true)}
+                        className="w-full h-80 border border-gray-300 rounded px-3 py-2 text-sm font-mono bg-gray-50"
+                      />
+                      <button
+                        onClick={() => copyEmailToClipboard(true)}
+                        className="w-full mt-2 bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 rounded text-sm"
+                      >
+                        {copiedEmail ? '✓ Copié !' : '📋 Copier la relance'}
+                      </button>
+                    </div>
+                  )}
+                </div>
 
-              <textarea
-                readOnly
-                value={generateEmailText(emailModalContrat)}
-                className="w-full h-80 border border-gray-300 rounded px-3 py-2 text-sm font-mono bg-gray-50"
-              />
-
-              <div className="flex gap-3 mt-4">
-                <button
-                  onClick={copyEmailToClipboard}
-                  className="flex-1 bg-green-500 hover:bg-green-600 text-white font-medium py-2 rounded"
-                >
-                  {copiedEmail ? '✓ Copié !' : '📋 Copier dans le presse-papier'}
-                </button>
-                <button
-                  onClick={() => setEmailModalContrat(null)}
-                  className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 rounded"
-                >
-                  Fermer
-                </button>
+                <div className="flex gap-3 mt-4">
+                  <button
+                    onClick={() => setEmailModalContrat(null)}
+                    className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 rounded"
+                  >
+                    Fermer
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };
