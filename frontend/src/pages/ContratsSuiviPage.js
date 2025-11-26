@@ -24,6 +24,8 @@ const ContratsSuiviPage = () => {
     prix: ""
   });
   const [praticienInput, setPraticienInput] = useState("");
+  const [emailModalContrat, setEmailModalContrat] = useState(null);
+  const [copiedEmail, setCopiedEmail] = useState(false);
   // Apply deep-link filters from URL on first load
   useEffect(() => {
     try {
@@ -257,6 +259,33 @@ const ContratsSuiviPage = () => {
     const dse = c.date_envoi ? Math.floor((Date.now() - new Date(c.date_envoi).getTime()) / (1000*60*60*24)) : 0;
     return acc + ((c.statut === 'Envoyé' && !c.date_reception && dse > overdueDays) ? 1 : 0);
   }, 0);
+
+  // Générer le texte email pour un contrat
+  const generateEmailText = (contrat) => {
+    const cabinetSafe = contrat.cabinet.replace(/[^a-z0-9_\-\s]/gi, '').replace(/\s+/g, '_');
+    const pdfFilename = `Contrat_de_services_${cabinetSafe}.pdf`;
+    
+    return `Bonjour,
+
+Veuillez trouver ci-joint le contrat de services pour ${contrat.cabinet}.
+
+Informations du contrat :
+- Cabinet : ${contrat.cabinet}
+- Adresse : ${contrat.adresse}, ${contrat.code_postal} ${contrat.ville}
+- Praticiens : ${contrat.praticiens.join(', ')}
+- Montant : ${contrat.prix}€
+
+Merci de nous retourner le contrat signé et tamponné par email.`;
+  };
+
+  const copyEmailToClipboard = () => {
+    if (!emailModalContrat) return;
+    const text = generateEmailText(emailModalContrat);
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedEmail(true);
+      setTimeout(() => setCopiedEmail(false), 2000);
+    });
+  };
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
@@ -493,6 +522,16 @@ const ContratsSuiviPage = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          setEmailModalContrat(c);
+                        }}
+                        className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs"
+                        title="Texte email"
+                      >
+                        📧
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
                           openEditModal(c);
                         }}
                         className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs"
@@ -648,6 +687,44 @@ const ContratsSuiviPage = () => {
           </div>
         </div>
       </div>
+
+      {/* MODAL EMAIL */}
+      {emailModalContrat && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-4">
+                📧 Texte email pour {emailModalContrat.cabinet}
+              </h2>
+              
+              <p className="text-sm text-gray-600 mb-3">
+                Copie le texte ci-dessous dans le corps de ton email.
+              </p>
+
+              <textarea
+                readOnly
+                value={generateEmailText(emailModalContrat)}
+                className="w-full h-80 border border-gray-300 rounded px-3 py-2 text-sm font-mono bg-gray-50"
+              />
+
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={copyEmailToClipboard}
+                  className="flex-1 bg-green-500 hover:bg-green-600 text-white font-medium py-2 rounded"
+                >
+                  {copiedEmail ? '✓ Copié !' : '📋 Copier dans le presse-papier'}
+                </button>
+                <button
+                  onClick={() => setEmailModalContrat(null)}
+                  className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 rounded"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
