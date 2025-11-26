@@ -4,12 +4,16 @@ import { Link } from "react-router-dom";
 const Navbar = () => {
   return (
     <nav style={styles.nav}>
-      <h2 style={styles.logo}>AdFollow</h2>
+      <h2 style={styles.logo}>
+        <Link to="/" style={{ color: "#fff", textDecoration: "none" }}>
+          AdFollow
+        </Link>
+      </h2>
       <div style={styles.links}>
-        <Link style={styles.link} to="/suivi-contrats">Contrats</Link>
+        <Link style={styles.link} to="/contrats">Contrats</Link>
+        <Link style={styles.link} to="/contrats/nouveau">Nouveau contrat</Link>
         <Link style={styles.link} to="/praticiens">Praticiens</Link>
         <Link style={styles.link} to="/installations">Installations</Link>
-        <Link style={styles.link} to="/praticiens">Praticiens</Link>        
       </div>
     </nav>
   );
