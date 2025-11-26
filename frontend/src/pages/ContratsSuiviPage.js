@@ -12,6 +12,8 @@ const ContratsSuiviPage = () => {
   const [checkingPdf, setCheckingPdf] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("Tous");
+  const [overdueDays, setOverdueDays] = useState(7);
+  const [showOverdueOnly, setShowOverdueOnly] = useState(false);
   const [editingContrat, setEditingContrat] = useState(null);
   const [editForm, setEditForm] = useState({
     cabinet: "",
@@ -193,14 +195,24 @@ const ContratsSuiviPage = () => {
   };
 
   // RECHERCHE ET FILTRAGE
+  const daysSince = (dateStr) => {
+    if (!dateStr) return 0;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 0;
+    const ms = Date.now() - d.getTime();
+    return Math.floor(ms / (1000 * 60 * 60 * 24));
+  };
+
   const filteredContrats = contrats.filter(c => {
     const matchesSearch = 
       c.cabinet.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.ville.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === "Tous" || c.statut === statusFilter;
+    const isOverdue = c.statut === 'Envoyé' && !c.date_reception && daysSince(c.date_envoi) > overdueDays;
+    const matchesOverdue = !showOverdueOnly || isOverdue;
     
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesStatus && matchesOverdue;
   });
 
   const selectedContrat = selectedContratId 
@@ -227,13 +239,19 @@ const ContratsSuiviPage = () => {
     );
   };
 
+  // Compter les envoyés en retard
+  const overdueCount = contrats.reduce((acc, c) => {
+    const dse = c.date_envoi ? Math.floor((Date.now() - new Date(c.date_envoi).getTime()) / (1000*60*60*24)) : 0;
+    return acc + ((c.statut === 'Envoyé' && !c.date_reception && dse > overdueDays) ? 1 : 0);
+  }, 0);
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <div className="p-6 pb-0">
         <h1 className="text-2xl font-bold text-gray-800">Suivi des Contrats</h1>
         
               {/* BARRE DE RECHERCHE ET FILTRES */}
-              <div className="mt-4 flex gap-3">
+              <div className="mt-4 flex flex-wrap gap-3 items-center">
                 <input
                   type="text"
                   placeholder="Rechercher par cabinet ou ville..."
@@ -251,6 +269,29 @@ const ContratsSuiviPage = () => {
                   <option value="Envoyé">Envoyé</option>
                   <option value="Reçu">Reçu</option>
                 </select>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-700">Retard &gt;=</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={overdueDays}
+                    onChange={(e) => setOverdueDays(Math.max(1, Number(e.target.value) || 1))}
+                    className="w-20 border border-gray-300 rounded px-2 py-2 text-sm"
+                    title="Nombre de jours depuis l'envoi"
+                  />
+                  <span className="text-sm text-gray-700">jours</span>
+                  <label className="inline-flex items-center gap-2 text-sm ml-2">
+                    <input
+                      type="checkbox"
+                      checked={showOverdueOnly}
+                      onChange={(e) => setShowOverdueOnly(e.target.checked)}
+                    />
+                    Retards uniquement
+                  </label>
+                  <span className="ml-2 text-xs px-2 py-1 rounded bg-red-100 text-red-700" title="Contrats envoyés sans réception au-delà du délai">
+                    {overdueCount} en retard
+                  </span>
+                </div>
                 {(searchTerm || statusFilter !== "Tous") && (
                   <button
                     onClick={() => { setSearchTerm(""); setStatusFilter("Tous"); }}
@@ -411,16 +452,28 @@ const ContratsSuiviPage = () => {
                   key={c.id_contrat}
                   onClick={() => setSelectedContratId(c.id_contrat)}
                   className={`bg-white p-3 rounded border-2 cursor-pointer transition ${
-                    selectedContratId === c.id_contrat
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200 hover:border-blue-300"
+                    (c.statut === 'Envoyé' && !c.date_reception && ((Date.now()-new Date(c.date_envoi).getTime())/(1000*60*60*24)) > overdueDays)
+                      ? "border-red-400 bg-red-50"
+                      : selectedContratId === c.id_contrat
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 hover:border-blue-300"
                   }`}
                 >
                   {/* TITRE + BOUTON SUPPRIMER */}
                   <div className="flex justify-between items-start gap-2">
                     <div className="flex-1">
                       <h2 className="text-sm font-semibold text-gray-900">{c.cabinet}</h2>
-                      <div className="mt-1">{getStatusBadge(c.statut)}</div>
+                      <div className="mt-1 flex items-center gap-2">
+                        {getStatusBadge(c.statut)}
+                        {c.statut === 'Envoyé' && !c.date_reception && (
+                          <span className="text-[11px] text-gray-600">
+                            envoyé il y a {Math.max(0, Math.floor((Date.now()-new Date(c.date_envoi).getTime())/(1000*60*60*24)))}j
+                          </span>
+                        )}
+                        {c.statut === 'Envoyé' && !c.date_reception && Math.floor((Date.now()-new Date(c.date_envoi).getTime())/(1000*60*60*24)) > overdueDays && (
+                          <span className="text-[11px] font-medium text-red-700 bg-red-100 px-2 py-0.5 rounded">En retard</span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex gap-1 flex-shrink-0">
