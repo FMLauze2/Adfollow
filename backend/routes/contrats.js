@@ -57,7 +57,7 @@ router.get('/', async (req, res) => {
     // POST create new contrat
   router.post('/', async (req, res) => {
     try {
-      let { cabinet, adresse, code_postal, ville, praticiens, prix, date_envoi, date_reception } = req.body;
+      let { cabinet, adresse, code_postal, ville, praticiens, prix, email, date_envoi, date_reception } = req.body;
 
       // Convertir praticiens en JSON si ce n'est pas déjà
       if (!Array.isArray(praticiens)) {
@@ -70,9 +70,9 @@ router.get('/', async (req, res) => {
 
       // Insertion du contrat
       const result = await pool.query(
-        `INSERT INTO contrats (cabinet, adresse, code_postal, ville, praticiens, prix, date_envoi, date_reception, date_creation)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW()) RETURNING *`,
-        [cabinet, adresse, code_postal, ville, JSON.stringify(praticiens), prix, date_envoi || null, date_reception || null]
+        `INSERT INTO contrats (cabinet, adresse, code_postal, ville, praticiens, prix, email, date_envoi, date_reception, date_creation)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW()) RETURNING *`,
+        [cabinet, adresse, code_postal, ville, JSON.stringify(praticiens), prix, email || null, date_envoi || null, date_reception || null]
       );
 
       const contratCree = result.rows[0];
@@ -98,7 +98,7 @@ router.get('/', async (req, res) => {
 // PUT /api/contrats/:id - modifier un contrat complet
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  let { cabinet, adresse, code_postal, ville, praticiens, prix, date_envoi, date_reception } = req.body;
+  let { cabinet, adresse, code_postal, ville, praticiens, prix, email, date_envoi, date_reception } = req.body;
 
   if (!id) return res.status(400).json({ error: 'id manquant' });
 
@@ -150,6 +150,10 @@ router.put('/:id', async (req, res) => {
       updates.push(`prix = $${paramIndex++}`);
       values.push(prix);
     }
+    if (email !== undefined) {
+      updates.push(`email = $${paramIndex++}`);
+      values.push(email || null);
+    }
     if (date_envoi !== undefined) {
       updates.push(`date_envoi = $${paramIndex++}`);
       values.push(date_envoi || null);
@@ -169,28 +173,43 @@ router.put('/:id', async (req, res) => {
     const result = await pool.query(query, values);
     const contratModifie = result.rows[0];
 
-    // Si le cabinet a changé, supprimer l'ancien PDF
-    if (oldCabinet && cabinet && oldCabinet !== cabinet) {
-      const oldCabinetSafe = oldCabinet.replace(/[^a-z0-9_\-\s]/gi, '').replace(/\s+/g, '_');
-      const oldPdfPath = path.join(__dirname, '..', 'services', 'pdf', 'uploads', 'contrats', `Contrat_de_services_${oldCabinetSafe}.pdf`);
-      
-      if (fs.existsSync(oldPdfPath)) {
-        fs.unlinkSync(oldPdfPath);
-        console.log(`Ancien PDF supprimé: ${oldPdfPath}`);
+    // Déterminer si on doit régénérer le PDF (seulement si les données du contrat ont changé, pas les dates)
+    const shouldRegeneratePdf = cabinet !== undefined || adresse !== undefined || 
+                                 code_postal !== undefined || ville !== undefined || 
+                                 praticiens !== undefined || prix !== undefined;
+
+    if (shouldRegeneratePdf) {
+      // Si le cabinet a changé, supprimer l'ancien PDF
+      if (oldCabinet && cabinet && oldCabinet !== cabinet) {
+        const oldCabinetSafe = oldCabinet.replace(/[^a-z0-9_\-\s]/gi, '').replace(/\s+/g, '_');
+        const oldPdfPath = path.join(__dirname, '..', 'services', 'pdf', 'uploads', 'contrats', `Contrat_de_services_${oldCabinetSafe}.pdf`);
+        
+        if (fs.existsSync(oldPdfPath)) {
+          fs.unlinkSync(oldPdfPath);
+          console.log(`Ancien PDF supprimé: ${oldPdfPath}`);
+        }
+      }
+
+      // Régénérer le PDF avec les nouvelles données
+      try {
+        const pdfPath = await generateContratPDF(contratModifie);
+        contratModifie.pdf_path = pdfPath;
+        console.log(`PDF régénéré: ${pdfPath}`);
+      } catch (pdfErr) {
+        console.error('Erreur régénération PDF:', pdfErr);
+        // On continue quand même
       }
     }
 
-    // Régénérer le PDF avec les nouvelles données
-    try {
-      const pdfPath = await generateContratPDF(contratModifie);
-      contratModifie.pdf_path = pdfPath;
-      console.log(`PDF régénéré: ${pdfPath}`);
-    } catch (pdfErr) {
-      console.error('Erreur régénération PDF:', pdfErr);
-      // On continue quand même
+    // Ajouter le statut calculé avant de renvoyer
+    let statut = 'Brouillon';
+    if (contratModifie.date_reception) {
+      statut = 'Reçu';
+    } else if (contratModifie.date_envoi) {
+      statut = 'Envoyé';
     }
 
-    res.json(contratModifie);
+    res.json({ ...contratModifie, statut });
   } catch (err) {
     console.error('Erreur update contrat:', err);
     res.status(500).json({ error: 'Erreur lors de la mise à jour du contrat' });

@@ -9,6 +9,7 @@ const ContratsForm = () => {
   const [ville, setVille] = useState('');
   const [praticiensInput, setPraticiensInput] = useState('');
   const [prix, setPrix] = useState('');
+  const [email, setEmail] = useState('');
   const [dateEnvoi, setDateEnvoi] = useState('');
   const [dateReception, setDateReception] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,6 +30,7 @@ const ContratsForm = () => {
       ville,
       praticiens: praticiensArray,
       prix: parseFloat(prix),
+      email: email || null,
       date_envoi: dateEnvoi || null,
       date_reception: dateReception || null
     };
@@ -43,6 +45,7 @@ const ContratsForm = () => {
       setVille('');
       setPraticiensInput('');
       setPrix('');
+      setEmail('');
       setDateEnvoi('');
       setDateReception('');
 
@@ -65,6 +68,7 @@ const ContratsForm = () => {
     setVille('Paris');
     setPraticiensInput('Dr. Dupont, Dr. Martin, Dr. Leclerc');
     setPrix('1500.00');
+    setEmail('contact@cabinettest.fr');
     setDateEnvoi(today);
     setDateReception(tomorrow);
   };
@@ -159,6 +163,18 @@ const ContratsForm = () => {
             value={prix}
             onChange={e => setPrix(e.target.value)}
             required
+            disabled={loading}
+            className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-100"
+          />
+        </div>
+
+        <div className="flex flex-col">
+          <label className="mb-1 font-medium text-gray-700">Email (pour envoi)</label>
+          <input
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="contact@cabinet.fr"
             disabled={loading}
             className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-100"
           />

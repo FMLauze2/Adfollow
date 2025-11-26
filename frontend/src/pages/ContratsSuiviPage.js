@@ -21,7 +21,8 @@ const ContratsSuiviPage = () => {
     code_postal: "",
     ville: "",
     praticiens: [],
-    prix: ""
+    prix: "",
+    email: ""
   });
   const [praticienInput, setPraticienInput] = useState("");
   const [emailModalContrat, setEmailModalContrat] = useState(null);
@@ -143,12 +144,26 @@ const ContratsSuiviPage = () => {
     setUpdatingDates(prev => ({ ...prev, [id]: true }));
 
     try {
-      await axios.put(`http://localhost:4000/api/contrats/${id}`, {
+      const response = await axios.put(`http://localhost:4000/api/contrats/${id}`, {
         date_envoi,
         date_reception,
       });
+      
+      // Mettre à jour uniquement le contrat modifié dans la liste
+      setContrats(prev => prev.map(c => 
+        c.id_contrat === id ? response.data : c
+      ));
+      
+      // Mettre à jour les dates dans l'état local avec les valeurs envoyées (pas celles du serveur qui peuvent être décalées)
+      setDates(prev => ({
+        ...prev,
+        [id]: {
+          date_envoi: date_envoi || "",
+          date_reception: date_reception || ""
+        }
+      }));
+      
       alert("Dates mises à jour !");
-      fetchContrats();
     } catch (err) {
       console.error("Erreur update contrat:", err);
       alert("Erreur lors de la mise à jour");
@@ -168,7 +183,8 @@ const ContratsSuiviPage = () => {
       code_postal: contrat.code_postal,
       ville: contrat.ville,
       praticiens: [...contrat.praticiens],
-      prix: contrat.prix
+      prix: contrat.prix,
+      email: contrat.email || ""
     });
   };
 
@@ -181,6 +197,7 @@ const ContratsSuiviPage = () => {
     try {
       const response = await axios.put(`http://localhost:4000/api/contrats/${editingContrat.id_contrat}`, {
         ...editForm,
+        email: editForm.email || null,
         date_envoi: dates[editingContrat.id_contrat]?.date_envoi || null,
         date_reception: dates[editingContrat.id_contrat]?.date_reception || null
       });
@@ -512,6 +529,20 @@ Merci de nous retourner le contrat signé et tamponné par email.`;
                             className="w-full border border-gray-300 rounded px-3 py-2"
                           />
                         </div>
+
+                        {/* Email */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Email (pour envoi)
+                          </label>
+                          <input
+                            type="email"
+                            value={editForm.email}
+                            onChange={(e) => setEditForm({...editForm, email: e.target.value})}
+                            placeholder="contact@cabinet.fr"
+                            className="w-full border border-gray-300 rounded px-3 py-2"
+                          />
+                        </div>
                       </div>
 
                       {/* Boutons */}
@@ -590,13 +621,27 @@ Merci de nous retourner le contrat signé et tamponné par email.`;
                       >
                         {regeneratingPdf[c.id_contrat] ? '⏳' : '🔄'}
                       </button>
+                      <a
+                        href={`mailto:${c.email || ''}?subject=${encodeURIComponent('Contrat de services - ' + c.cabinet)}&body=${encodeURIComponent(generateEmailText(c, false))}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!c.email) {
+                            e.preventDefault();
+                            alert('Aucun email configuré pour ce contrat. Utilisez le bouton 📧 pour copier le texte.');
+                          }
+                        }}
+                        className="bg-teal-500 hover:bg-teal-600 text-white px-2 py-1 rounded text-xs inline-block"
+                        title={c.email ? `Ouvrir Thunderbird (${c.email})` : 'Pas d\'email configuré'}
+                      >
+                        ✉️
+                      </a>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setEmailModalContrat(c);
                         }}
                         className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs"
-                        title="Texte email"
+                        title="Copier texte email"
                       >
                         📧
                       </button>
