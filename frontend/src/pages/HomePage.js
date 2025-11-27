@@ -5,6 +5,7 @@ const HomePage = () => {
   const [overdueDays] = useState(7);
   const [overdueCount, setOverdueCount] = useState(0);
   const [todayRdvCount, setTodayRdvCount] = useState(0);
+  const [upcomingRdv, setUpcomingRdv] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -36,6 +37,23 @@ const HomePage = () => {
         
         console.log(`Total RDV aujourd'hui (non annulés): ${todayRdv.length}`);
         setTodayRdvCount(todayRdv.length);
+
+        // Fetch RDV à venir (prochains 14 jours, non annulés)
+        const upcoming = (rdvRes.data || [])
+          .filter(rdv => {
+            if (!rdv.date_rdv || rdv.statut === 'Annulé') return false;
+            const rdvDate = new Date(rdv.date_rdv.split('T')[0]);
+            const todayDate = new Date(today);
+            const in14Days = new Date(todayDate);
+            in14Days.setDate(in14Days.getDate() + 14);
+            return rdvDate >= todayDate && rdvDate <= in14Days;
+          })
+          .sort((a, b) => {
+            const dateA = new Date(a.date_rdv + 'T' + a.heure_rdv);
+            const dateB = new Date(b.date_rdv + 'T' + b.heure_rdv);
+            return dateA - dateB;
+          });
+        setUpcomingRdv(upcoming);
       } catch (e) {
         // ignore banner errors
       } finally {
@@ -144,6 +162,63 @@ const HomePage = () => {
           </a>
         </div>
       </div>
+
+      {/* Calendrier des RDV à venir */}
+      {!loading && upcomingRdv.length > 0 && (
+        <div className="max-w-6xl mx-auto mt-12">
+          <h2 className="text-2xl font-bold text-gray-800 mb-6 text-left">📅 Prochains rendez-vous (14 jours)</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {upcomingRdv.map(rdv => {
+              const rdvDate = new Date(rdv.date_rdv.split('T')[0]);
+              const dateStr = rdvDate.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+              const isToday = rdvDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
+              
+              return (
+                <div 
+                  key={rdv.id_rdv} 
+                  className={`bg-white rounded-lg shadow p-4 border-l-4 ${
+                    isToday ? 'border-blue-500 bg-blue-50' : 
+                    rdv.statut === 'Planifié' ? 'border-green-500' : 'border-gray-400'
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900">{rdv.cabinet}</h3>
+                      <p className="text-xs text-gray-600">{rdv.type_rdv}</p>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      rdv.statut === 'Planifié' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {rdv.statut}
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-1 text-sm text-gray-700">
+                    <p className="flex items-center gap-2">
+                      <span className={isToday ? 'font-bold text-blue-600' : ''}>
+                        🗓️ {dateStr} à {rdv.heure_rdv}
+                      </span>
+                    </p>
+                    <p className="text-xs text-gray-600">📍 {rdv.ville}</p>
+                    {rdv.praticiens && rdv.praticiens.length > 0 && (
+                      <p className="text-xs text-gray-600">
+                        👥 {rdv.praticiens.map(p => `${p.prenom} ${p.nom}`).join(', ')}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <a
+                    href="/installations"
+                    className="mt-3 block text-center text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded"
+                  >
+                    Voir détails →
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
