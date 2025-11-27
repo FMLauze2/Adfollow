@@ -55,11 +55,17 @@ const InstallationsPage = () => {
     setLoading(true);
     
     try {
+      // Préparer les données avec date au format ISO sans timezone
+      const submitData = {
+        ...form,
+        date_rdv: form.date_rdv // Garder le format YYYY-MM-DD simple
+      };
+      
       if (editingRdv) {
-        await axios.put(`http://localhost:4000/api/rendez-vous/${editingRdv.id_rdv}`, form);
+        await axios.put(`http://localhost:4000/api/rendez-vous/${editingRdv.id_rdv}`, submitData);
         alert("Rendez-vous modifié !");
       } else {
-        await axios.post("http://localhost:4000/api/rendez-vous", form);
+        await axios.post("http://localhost:4000/api/rendez-vous", submitData);
         alert("Rendez-vous créé !");
       }
       
@@ -91,32 +97,31 @@ const InstallationsPage = () => {
   };
 
   const handleFillTestData = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const dateStr = tomorrow.toISOString().split('T')[0];
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0];
     
-    setForm({
-      cabinet: "Cabinet Test RDV",
-      date_rdv: dateStr,
-      heure_rdv: "14:00",
-      type_rdv: "Installation",
-      adresse: "123 Rue de Test",
-      code_postal: "75001",
-      ville: "Paris",
-      praticiens: [
+    setForm(prev => ({
+      cabinet: prev.cabinet || "Cabinet Test RDV",
+      date_rdv: prev.date_rdv || dateStr,
+      heure_rdv: prev.heure_rdv || "14:00",
+      type_rdv: prev.type_rdv || "Installation",
+      adresse: prev.adresse || "123 Rue de Test",
+      code_postal: prev.code_postal || "75001",
+      ville: prev.ville || "Paris",
+      praticiens: prev.praticiens.length > 0 ? prev.praticiens : [
         { nom: "Dupont", prenom: "Jean" },
         { nom: "Martin", prenom: "Sophie" }
       ],
-      notes: "Installation complète avec formation des praticiens"
-    });
+      notes: prev.notes || "Installation complète avec formation des praticiens"
+    }));
   };
 
   const handleEdit = (rdv) => {
     setEditingRdv(rdv);
     setForm({
       cabinet: rdv.cabinet,
-      date_rdv: rdv.date_rdv,
-      heure_rdv: rdv.heure_rdv,
+      date_rdv: rdv.date_rdv ? rdv.date_rdv.split('T')[0] : '', // Extraire uniquement YYYY-MM-DD
+      heure_rdv: rdv.heure_rdv || '',
       type_rdv: rdv.type_rdv,
       adresse: rdv.adresse,
       code_postal: rdv.code_postal,
@@ -470,7 +475,7 @@ const InstallationsPage = () => {
               </div>
               
               <div className="text-sm space-y-1 mb-3">
-                <p><strong>📅 Date:</strong> {new Date(rdv.date_rdv).toLocaleDateString('fr-FR')} à {rdv.heure_rdv}</p>
+                <p><strong>📅 Date:</strong> {rdv.date_rdv.split('T')[0].split('-').reverse().join('/')} à {rdv.heure_rdv}</p>
                 <p><strong>📍 Lieu:</strong> {rdv.adresse}, {rdv.code_postal} {rdv.ville}</p>
                 {rdv.praticiens && rdv.praticiens.length > 0 && (
                   <p><strong>👥 Praticiens:</strong> {rdv.praticiens.map(p => `${p.prenom} ${p.nom}`).join(', ')}</p>
