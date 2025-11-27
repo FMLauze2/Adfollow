@@ -17,12 +17,14 @@ const cabinetRoutes = require('./routes/cabinets');
 const praticienRoutes = require('./routes/praticiens');
 const installationRoutes = require('./routes/installations');
 const contratRoutes = require('./routes/contrats');
+const rendezvousRoutes = require('./routes/rendezvous');
 
 // Use routes
 app.use('/api/cabinets', cabinetRoutes);
 app.use('/api/praticiens', praticienRoutes);
 app.use('/api/installations', installationRoutes);
 app.use('/api/contrats', contratRoutes);
+app.use('/api/rendez-vous', rendezvousRoutes);
 
 app.listen(4000, () => {
   console.log('Server running on http://localhost:4000');
