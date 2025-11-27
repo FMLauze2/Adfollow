@@ -14,7 +14,7 @@ const InstallationsPage = () => {
     cabinet: "",
     date_rdv: "",
     heure_rdv: "",
-    type_rdv: "Installation",
+    type_rdv: "Installation serveur",
     adresse: "",
     code_postal: "",
     ville: "",
@@ -84,7 +84,7 @@ const InstallationsPage = () => {
       cabinet: "",
       date_rdv: "",
       heure_rdv: "",
-      type_rdv: "Installation",
+      type_rdv: "Installation serveur",
       adresse: "",
       code_postal: "",
       ville: "",
@@ -288,8 +288,13 @@ const InstallationsPage = () => {
           className="border px-4 py-2 rounded"
         >
           <option value="Tous">Tous les types</option>
-          <option value="Installation">Installation</option>
-          <option value="Maintenance">Maintenance</option>
+          <option value="Installation serveur">Installation serveur</option>
+          <option value="Installation poste secondaire">Installation poste secondaire</option>
+          <option value="Changement de poste serveur">Changement de poste serveur</option>
+          <option value="Formation">Formation</option>
+          <option value="Export BDD">Export BDD</option>
+          <option value="Démo">Démo</option>
+          <option value="Mise à jour">Mise à jour</option>
           <option value="Autre">Autre</option>
         </select>
       </div>
@@ -320,8 +325,13 @@ const InstallationsPage = () => {
                   onChange={(e) => setForm({ ...form, type_rdv: e.target.value })}
                   className="w-full border px-3 py-2 rounded"
                 >
-                  <option value="Installation">Installation</option>
-                  <option value="Maintenance">Maintenance</option>
+                  <option value="Installation serveur">Installation serveur</option>
+                  <option value="Installation poste secondaire">Installation poste secondaire</option>
+                  <option value="Changement de poste serveur">Changement de poste serveur</option>
+                  <option value="Formation">Formation</option>
+                  <option value="Export BDD">Export BDD</option>
+                  <option value="Démo">Démo</option>
+                  <option value="Mise à jour">Mise à jour</option>
                   <option value="Autre">Autre</option>
                 </select>
               </div>
