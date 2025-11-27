@@ -4,13 +4,15 @@ import axios from "axios";
 const HomePage = () => {
   const [overdueDays] = useState(7);
   const [overdueCount, setOverdueCount] = useState(0);
+  const [todayRdvCount, setTodayRdvCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchContrats = async () => {
+    const fetchData = async () => {
       try {
-        const res = await axios.get("http://localhost:4000/api/contrats");
-        const count = (res.data || []).reduce((acc, c) => {
+        // Fetch contrats pour les retards
+        const contratsRes = await axios.get("http://localhost:4000/api/contrats");
+        const count = (contratsRes.data || []).reduce((acc, c) => {
           if (c.statut === 'Envoyé' && !c.date_reception && c.date_envoi) {
             const days = Math.floor((Date.now() - new Date(c.date_envoi).getTime()) / (1000*60*60*24));
             return acc + (days > overdueDays ? 1 : 0);
@@ -18,20 +20,55 @@ const HomePage = () => {
           return acc;
         }, 0);
         setOverdueCount(count);
+
+        // Fetch RDV pour aujourd'hui
+        const rdvRes = await axios.get("http://localhost:4000/api/rendez-vous");
+        const today = new Date().toISOString().split('T')[0];
+        
+        const todayRdv = (rdvRes.data || []).filter(rdv => {
+          if (!rdv.date_rdv) return false;
+          const rdvDate = rdv.date_rdv.split('T')[0];
+          const isToday = rdvDate === today;
+          const notCancelled = rdv.statut !== 'Annulé'; // Compter Planifié ET Effectué
+          console.log(`RDV ${rdv.id_rdv}: ${rdvDate} === ${today}? ${isToday}, Statut: ${rdv.statut}`);
+          return isToday && notCancelled;
+        });
+        
+        console.log(`Total RDV aujourd'hui (non annulés): ${todayRdv.length}`);
+        setTodayRdvCount(todayRdv.length);
       } catch (e) {
         // ignore banner errors
       } finally {
         setLoading(false);
       }
     };
-    fetchContrats();
+    fetchData();
   }, [overdueDays]);
 
   return (
     <div className="text-center py-12">
-      {/* Bannière Notifications */}
-      {!loading && overdueCount > 0 && (
-        <div className="max-w-6xl mx-auto mb-6">
+      {/* Bannières Notifications */}
+      <div className="max-w-6xl mx-auto mb-6 space-y-4">
+        {/* Bannière RDV du jour */}
+        {!loading && todayRdvCount > 0 && (
+          <div className="rounded border border-blue-300 bg-blue-50 text-left p-4 flex items-center justify-between">
+            <div>
+              <p className="text-blue-800 font-semibold">
+                📅 {todayRdvCount} rendez-vous aujourd'hui
+              </p>
+              <p className="text-blue-700 text-sm">Planifiés et effectués du jour.</p>
+            </div>
+            <a
+              href="/installations"
+              className="ml-4 inline-block bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded"
+            >
+              Voir les RDV
+            </a>
+          </div>
+        )}
+
+        {/* Bannière Contrats en retard */}
+        {!loading && overdueCount > 0 && (
           <div className="rounded border border-red-300 bg-red-50 text-left p-4 flex items-center justify-between">
             <div>
               <p className="text-red-800 font-semibold">
@@ -46,8 +83,8 @@ const HomePage = () => {
               Voir les retards
             </a>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <h1 className="text-4xl font-bold mb-4 text-gray-800">Bienvenue sur Adfollow</h1>
       <p className="text-lg text-gray-600 mb-8">

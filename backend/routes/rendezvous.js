@@ -48,12 +48,17 @@ router.post('/', async (req, res) => {
       notes
     } = req.body;
 
+    // Compenser le décalage timezone en ajoutant 1 jour
+    const dateParts = date_rdv.split('-');
+    const dateObj = new Date(Date.UTC(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]) + 1));
+    const correctedDate = dateObj.toISOString().split('T')[0];
+    
     const result = await pool.query(
       `INSERT INTO rendez_vous 
        (cabinet, date_rdv, heure_rdv, type_rdv, adresse, code_postal, ville, praticiens, notes, statut, date_creation) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Planifié', NOW()) 
+       VALUES ($1, $2::date, $3, $4, $5, $6, $7, $8, $9, 'Planifié', NOW()) 
        RETURNING *`,
-      [cabinet, date_rdv, heure_rdv, type_rdv, adresse, code_postal, ville, JSON.stringify(praticiens || []), notes]
+      [cabinet, correctedDate, heure_rdv, type_rdv, adresse, code_postal, ville, JSON.stringify(praticiens || []), notes]
     );
 
     res.status(201).json(result.rows[0]);
@@ -91,8 +96,12 @@ router.put('/:id', async (req, res) => {
       values.push(cabinet);
     }
     if (date_rdv !== undefined) {
-      updates.push(`date_rdv = $${paramCount++}`);
-      values.push(date_rdv);
+      // Compenser le décalage timezone en ajoutant 1 jour
+      const dateParts = date_rdv.split('-');
+      const dateObj = new Date(Date.UTC(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]) + 1));
+      const correctedDate = dateObj.toISOString().split('T')[0];
+      updates.push(`date_rdv = $${paramCount++}::date`);
+      values.push(correctedDate);
     }
     if (heure_rdv !== undefined) {
       updates.push(`heure_rdv = $${paramCount++}`);
@@ -135,6 +144,9 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'Aucune modification fournie' });
     }
 
+    // Set timezone to avoid date shifting
+    await pool.query("SET TIME ZONE 'Europe/Paris'");
+    
     values.push(id);
     const query = `UPDATE rendez_vous SET ${updates.join(', ')} WHERE id_rdv = $${paramCount} RETURNING *`;
     
@@ -265,8 +277,13 @@ router.post('/:id/create-contrat', async (req, res) => {
     
     const nouveauContrat = contratResult.rows[0];
     
+    // Parser les praticiens si nécessaire (PostgreSQL retourne JSONB comme objet déjà parsé normalement)
+    if (typeof nouveauContrat.praticiens === 'string') {
+      nouveauContrat.praticiens = JSON.parse(nouveauContrat.praticiens);
+    }
+    
     // Générer le PDF du contrat
-    const generateContratPDF = require('../services/pdf/generateContratPDF');
+    const { generateContratPDF } = require('../services/pdf/generateContratPDF');
     await generateContratPDF(nouveauContrat);
     
     // Lier le contrat au RDV

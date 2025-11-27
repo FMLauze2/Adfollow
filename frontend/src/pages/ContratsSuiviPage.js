@@ -29,6 +29,7 @@ const ContratsSuiviPage = () => {
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [updatingDates, setUpdatingDates] = useState({});
   const [regeneratingPdf, setRegeneratingPdf] = useState({});
+  const [thunderbirdModalContrat, setThunderbirdModalContrat] = useState(null);
   // Apply deep-link filters from URL on first load
   useEffect(() => {
     try {
@@ -504,7 +505,9 @@ Merci de nous retourner le contrat signé et tamponné par email.`;
                           <div className="space-y-1">
                             {editForm.praticiens.map((p, i) => (
                               <div key={i} className="flex items-center justify-between bg-gray-100 px-3 py-2 rounded">
-                                <span className="text-sm">{p}</span>
+                                <span className="text-sm">
+                                  {typeof p === 'string' ? p : `${p.prenom} ${p.nom}`}
+                                </span>
                                 <button
                                   type="button"
                                   onClick={() => removePraticien(i)}
@@ -621,20 +624,18 @@ Merci de nous retourner le contrat signé et tamponné par email.`;
                       >
                         {regeneratingPdf[c.id_contrat] ? '⏳' : '🔄'}
                       </button>
-                      <a
-                        href={`mailto:${c.email || ''}?subject=${encodeURIComponent('Contrat de services - ' + c.cabinet)}&body=${encodeURIComponent(generateEmailText(c, false))}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!c.email) {
-                            e.preventDefault();
-                            alert('Aucun email configuré pour ce contrat. Utilisez le bouton 📧 pour copier le texte.');
-                          }
-                        }}
-                        className="bg-teal-500 hover:bg-teal-600 text-white px-2 py-1 rounded text-xs inline-block"
-                        title={c.email ? `Ouvrir Thunderbird (${c.email})` : 'Pas d\'email configuré'}
-                      >
-                        ✉️
-                      </a>
+                      {c.email && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setThunderbirdModalContrat(c);
+                          }}
+                          className="bg-teal-500 hover:bg-teal-600 text-white px-2 py-1 rounded text-xs"
+                          title={`Ouvrir Thunderbird (${c.email})`}
+                        >
+                          ✉️
+                        </button>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -882,6 +883,45 @@ Merci de nous retourner le contrat signé et tamponné par email.`;
           </div>
         );
       })()}
+
+      {/* Modal Thunderbird - Choix du type d'email */}
+      {thunderbirdModalContrat && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-bold mb-4">Ouvrir Thunderbird</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Quel type d'email souhaitez-vous envoyer ?
+            </p>
+            
+            <div className="space-y-3">
+              <a
+                href={`mailto:${thunderbirdModalContrat.email}?subject=${encodeURIComponent('Contrat de services - ' + thunderbirdModalContrat.cabinet)}&body=${encodeURIComponent(generateEmailText(thunderbirdModalContrat, false))}`}
+                onClick={() => setThunderbirdModalContrat(null)}
+                className="block w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 rounded text-center"
+              >
+                📧 Premier envoi
+              </a>
+              
+              {thunderbirdModalContrat.statut === 'Envoyé' && !thunderbirdModalContrat.date_reception && (
+                <a
+                  href={`mailto:${thunderbirdModalContrat.email}?subject=${encodeURIComponent('Relance - Contrat de services - ' + thunderbirdModalContrat.cabinet)}&body=${encodeURIComponent(generateEmailText(thunderbirdModalContrat, true))}`}
+                  onClick={() => setThunderbirdModalContrat(null)}
+                  className="block w-full bg-orange-500 hover:bg-orange-600 text-white font-medium py-3 rounded text-center"
+                >
+                  🔔 Relance
+                </a>
+              )}
+              
+              <button
+                onClick={() => setThunderbirdModalContrat(null)}
+                className="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-3 rounded"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
