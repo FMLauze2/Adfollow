@@ -13,5 +13,8 @@ logs/
 # Variables d'environnement
 .env
 
+# Migrations SQL
+migrations/
+
 # Build temp files
 tmp/
