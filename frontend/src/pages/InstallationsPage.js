@@ -18,6 +18,8 @@ const InstallationsPage = () => {
     adresse: "",
     code_postal: "",
     ville: "",
+    telephone: "",
+    email: "",
     praticiens: [],
     notes: ""
   });
@@ -88,6 +90,8 @@ const InstallationsPage = () => {
       adresse: "",
       code_postal: "",
       ville: "",
+      telephone: "",
+      email: "",
       praticiens: [],
       notes: ""
     });
@@ -126,6 +130,8 @@ const InstallationsPage = () => {
       adresse: rdv.adresse,
       code_postal: rdv.code_postal,
       ville: rdv.ville,
+      telephone: rdv.telephone || '',
+      email: rdv.email || '',
       praticiens: rdv.praticiens || [],
       notes: rdv.notes || ""
     });
@@ -157,6 +163,19 @@ const InstallationsPage = () => {
     } catch (error) {
       console.error("Erreur marquage effectué:", error);
       alert("Erreur lors du marquage comme effectué");
+    }
+  };
+
+  const handleFacturer = async (id) => {
+    if (!window.confirm("Marquer ce rendez-vous comme facturé ?")) return;
+    
+    try {
+      await axios.post(`http://localhost:4000/api/rendez-vous/${id}/facturer`);
+      alert("Rendez-vous marqué comme facturé !");
+      fetchRendezvous();
+    } catch (error) {
+      console.error("Erreur marquage facturé:", error);
+      alert("Erreur lors du marquage comme facturé");
     }
   };
 
@@ -234,6 +253,7 @@ const InstallationsPage = () => {
     const colors = {
       "Planifié": "bg-blue-100 text-blue-800",
       "Effectué": "bg-green-100 text-green-800",
+      "Facturé": "bg-purple-100 text-purple-800 font-bold",
       "Annulé": "bg-red-100 text-red-800"
     };
     return (
@@ -280,6 +300,7 @@ const InstallationsPage = () => {
           <option value="Tous">Tous les statuts</option>
           <option value="Planifié">Planifié</option>
           <option value="Effectué">Effectué</option>
+          <option value="Facturé">Facturé</option>
           <option value="Annulé">Annulé</option>
         </select>
         <select
@@ -383,6 +404,26 @@ const InstallationsPage = () => {
                   value={form.ville}
                   onChange={(e) => setForm({ ...form, ville: e.target.value })}
                   className="w-full border px-3 py-2 rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Téléphone</label>
+                <input
+                  type="tel"
+                  value={form.telephone}
+                  onChange={(e) => setForm({ ...form, telephone: e.target.value })}
+                  className="w-full border px-3 py-2 rounded"
+                  placeholder="06 12 34 56 78"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Email</label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  className="w-full border px-3 py-2 rounded"
+                  placeholder="contact@cabinet.fr"
                 />
               </div>
             </div>
@@ -509,6 +550,14 @@ const InstallationsPage = () => {
                     className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600"
                   >
                     ✓ Marquer comme Effectué
+                  </button>
+                )}
+                {rdv.statut === "Effectué" && (
+                  <button
+                    onClick={() => handleFacturer(rdv.id_rdv)}
+                    className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600"
+                  >
+                    💰 Marquer comme Facturé
                   </button>
                 )}
                 <button
