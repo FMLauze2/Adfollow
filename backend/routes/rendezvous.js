@@ -235,6 +235,31 @@ Statut: Effectué`;
   }
 });
 
+// POST marquer un RDV comme facturé
+router.post('/:id/facturer', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Marquer comme facturé
+    const result = await pool.query(
+      "UPDATE rendez_vous SET statut = 'Facturé' WHERE id_rdv = $1 RETURNING *",
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'RDV non trouvé' });
+    }
+    
+    res.json({ 
+      message: 'RDV marqué comme facturé',
+      rdv: result.rows[0]
+    });
+  } catch (err) {
+    console.error('Erreur marquage RDV facturé:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // POST créer un contrat à partir d'un RDV
 router.post('/:id/create-contrat', async (req, res) => {
   try {
