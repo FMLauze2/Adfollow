@@ -24,6 +24,9 @@ const InstallationsPage = () => {
     notes: ""
   });
   
+  // Champs spécifiques par type de RDV
+  const [specificFields, setSpecificFields] = useState({});
+  
   const [praticienForm, setPraticienForm] = useState({ nom: "", prenom: "" });
   
   // Modal états
@@ -57,10 +60,17 @@ const InstallationsPage = () => {
     setLoading(true);
     
     try {
+      // Construire les notes avec champs spécifiques en JSON
+      const notesData = {
+        specificFields,
+        generalNotes: form.notes
+      };
+      
       // Préparer les données avec date au format ISO sans timezone
       const submitData = {
         ...form,
-        date_rdv: form.date_rdv // Garder le format YYYY-MM-DD simple
+        date_rdv: form.date_rdv, // Garder le format YYYY-MM-DD simple
+        notes: JSON.stringify(notesData)
       };
       
       if (editingRdv) {
@@ -95,6 +105,7 @@ const InstallationsPage = () => {
       praticiens: [],
       notes: ""
     });
+    setSpecificFields({});
     setPraticienForm({ nom: "", prenom: "" });
     setEditingRdv(null);
     setShowForm(false);
@@ -122,6 +133,18 @@ const InstallationsPage = () => {
 
   const handleEdit = (rdv) => {
     setEditingRdv(rdv);
+    
+    // Parser les notes pour extraire les champs spécifiques
+    let parsedNotes = "";
+    let parsedSpecificFields = {};
+    try {
+      const notesData = JSON.parse(rdv.notes || "{}");
+      parsedSpecificFields = notesData.specificFields || {};
+      parsedNotes = notesData.generalNotes || "";
+    } catch {
+      parsedNotes = rdv.notes || "";
+    }
+    
     setForm({
       cabinet: rdv.cabinet,
       date_rdv: rdv.date_rdv ? rdv.date_rdv.split('T')[0] : '', // Extraire uniquement YYYY-MM-DD
@@ -133,8 +156,9 @@ const InstallationsPage = () => {
       telephone: rdv.telephone || '',
       email: rdv.email || '',
       praticiens: rdv.praticiens || [],
-      notes: rdv.notes || ""
+      notes: parsedNotes
     });
+    setSpecificFields(parsedSpecificFields);
     setShowForm(true);
   };
 
@@ -249,6 +273,63 @@ const InstallationsPage = () => {
     }));
   };
 
+  // Définition des champs spécifiques par type de RDV
+  const getFieldsForType = (type) => {
+    switch (type) {
+      case "Installation serveur":
+        return [
+          { name: "nom_poste_serveur", label: "Nom poste serveur", type: "text" },
+          { name: "type_poste_serveur", label: "Type poste serveur", type: "text" },
+          { name: "nb_postes_secondaires", label: "Nombre de postes secondaires", type: "number" },
+          { name: "nb_lecteurs_carte", label: "Nombres de lecteurs de carte", type: "number" },
+          { name: "type_lecteurs_carte", label: "Type de lecteurs de carte", type: "text" },
+          { name: "fournisseur_lecteur", label: "Fournisseur lecteur de carte", type: "text" }
+        ];
+      case "Installation poste secondaire":
+        return [
+          { name: "nom_poste_serveur", label: "Nom poste serveur", type: "text" }
+        ];
+      case "Changement de poste serveur":
+        return [
+          { name: "nom_ancien_serveur", label: "Nom ancien serveur", type: "text" },
+          { name: "nom_nouveau_serveur", label: "Nom nouveau serveur", type: "text" },
+          { name: "version_ancien_serveur", label: "Version de l'ancien serveur", type: "text" }
+        ];
+      case "Export BDD":
+        return [
+          { name: "format_export", label: "Format des données d'export", type: "text" }
+        ];
+      case "Mise à jour":
+        return [
+          { name: "version_cible", label: "Version ciblée par la mise à jour", type: "text" },
+          { name: "version_base", label: "Version installée de base", type: "text" }
+        ];
+      case "Démo":
+        return [
+          { name: "logiciel_metier", label: "Logiciel métier utilisé (optionnel)", type: "text", required: false }
+        ];
+      default:
+        return [];
+    }
+  };
+
+  // Vérifier si le type de RDV doit afficher la section praticiens
+  const shouldShowPraticiens = (type) => {
+    const typesWithoutPraticiens = [
+      "Installation poste secondaire",
+      "Changement de poste serveur",
+      "Démo",
+      "Mise à jour"
+    ];
+    return !typesWithoutPraticiens.includes(type);
+  };
+
+  // Handler pour changer le type de RDV et réinitialiser les champs spécifiques
+  const handleTypeChange = (newType) => {
+    setForm({ ...form, type_rdv: newType });
+    setSpecificFields({});
+  };
+
   const getStatusBadge = (statut) => {
     const colors = {
       "Planifié": "bg-blue-100 text-blue-800",
@@ -343,7 +424,7 @@ const InstallationsPage = () => {
                 <select
                   required
                   value={form.type_rdv}
-                  onChange={(e) => setForm({ ...form, type_rdv: e.target.value })}
+                  onChange={(e) => handleTypeChange(e.target.value)}
                   className="w-full border px-3 py-2 rounded"
                 >
                   <option value="Installation serveur">Installation serveur</option>
@@ -428,56 +509,82 @@ const InstallationsPage = () => {
               </div>
             </div>
 
-            {/* Praticiens */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Praticiens</label>
-              <div className="flex gap-2 mb-2">
-                <input
-                  type="text"
-                  placeholder="Nom"
-                  value={praticienForm.nom}
-                  onChange={(e) => setPraticienForm({ ...praticienForm, nom: e.target.value })}
-                  className="border px-3 py-2 rounded flex-1"
-                />
-                <input
-                  type="text"
-                  placeholder="Prénom"
-                  value={praticienForm.prenom}
-                  onChange={(e) => setPraticienForm({ ...praticienForm, prenom: e.target.value })}
-                  className="border px-3 py-2 rounded flex-1"
-                />
-                <button
-                  type="button"
-                  onClick={addPraticien}
-                  className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-                >
-                  +
-                </button>
+            {/* Champs spécifiques selon le type de RDV */}
+            {getFieldsForType(form.type_rdv).length > 0 && (
+              <div className="border-t pt-4">
+                <h4 className="text-md font-semibold mb-3 text-blue-600">Informations spécifiques - {form.type_rdv}</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  {getFieldsForType(form.type_rdv).map(field => (
+                    <div key={field.name}>
+                      <label className="block text-sm font-medium mb-1">
+                        {field.label} {field.required !== false && "*"}
+                      </label>
+                      <input
+                        type={field.type}
+                        value={specificFields[field.name] || ""}
+                        onChange={(e) => setSpecificFields({ ...specificFields, [field.name]: e.target.value })}
+                        className="w-full border px-3 py-2 rounded"
+                        required={field.required !== false}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="space-y-1">
-                {form.praticiens.map((p, i) => (
-                  <div key={i} className="flex justify-between items-center bg-gray-100 px-3 py-2 rounded">
-                    <span>{p.prenom} {p.nom}</span>
-                    <button
-                      type="button"
-                      onClick={() => removePraticien(i)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
+            )}
 
-            {/* Notes */}
+            {/* Praticiens - Conditionnel selon le type */}
+            {shouldShowPraticiens(form.type_rdv) && (
+              <div>
+                <label className="block text-sm font-medium mb-2">Praticiens</label>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    placeholder="Nom"
+                    value={praticienForm.nom}
+                    onChange={(e) => setPraticienForm({ ...praticienForm, nom: e.target.value })}
+                    className="border px-3 py-2 rounded flex-1"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Prénom"
+                    value={praticienForm.prenom}
+                    onChange={(e) => setPraticienForm({ ...praticienForm, prenom: e.target.value })}
+                    className="border px-3 py-2 rounded flex-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={addPraticien}
+                    className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                  >
+                    +
+                  </button>
+                </div>
+                <div className="space-y-1">
+                  {form.praticiens.map((p, i) => (
+                    <div key={i} className="flex justify-between items-center bg-gray-100 px-3 py-2 rounded">
+                      <span>{p.prenom} {p.nom}</span>
+                      <button
+                        type="button"
+                        onClick={() => removePraticien(i)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Notes générales */}
             <div>
-              <label className="block text-sm font-medium mb-1">Notes</label>
+              <label className="block text-sm font-medium mb-1">Notes générales</label>
               <textarea
                 value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 rows="3"
                 className="w-full border px-3 py-2 rounded"
+                placeholder="Notes complémentaires..."
               />
             </div>
 
