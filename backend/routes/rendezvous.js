@@ -284,6 +284,31 @@ router.post('/:id/facturer', async (req, res) => {
   }
 });
 
+// POST remettre un RDV à l'état Planifié
+router.post('/:id/replanifier', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Remettre à Planifié
+    const result = await pool.query(
+      "UPDATE rendez_vous SET statut = 'Planifié' WHERE id_rdv = $1 RETURNING *",
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'RDV non trouvé' });
+    }
+    
+    res.json({ 
+      message: 'RDV remis à l\'état Planifié',
+      rdv: result.rows[0]
+    });
+  } catch (err) {
+    console.error('Erreur replanification RDV:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // POST créer un contrat à partir d'un RDV
 router.post('/:id/create-contrat', async (req, res) => {
   try {

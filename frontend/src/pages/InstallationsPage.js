@@ -203,6 +203,19 @@ const InstallationsPage = () => {
     }
   };
 
+  const handleReplanifier = async (id) => {
+    if (!window.confirm("Remettre ce rendez-vous à l'état 'Planifié' ?")) return;
+    
+    try {
+      await axios.post(`http://localhost:4000/api/rendez-vous/${id}/replanifier`);
+      alert("Rendez-vous remis à l'état Planifié !");
+      fetchRendezvous();
+    } catch (error) {
+      console.error("Erreur replanification:", error);
+      alert("Erreur lors de la replanification");
+    }
+  };
+
   const handleCreateContrat = async () => {
     if (!contratPrix || parseFloat(contratPrix) <= 0) {
       alert("Veuillez entrer un prix valide");
@@ -660,12 +673,20 @@ const InstallationsPage = () => {
                   </button>
                 )}
                 {rdv.statut === "Effectué" && (
-                  <button
-                    onClick={() => handleFacturer(rdv.id_rdv)}
-                    className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600"
-                  >
-                    💰 Marquer comme Facturé
-                  </button>
+                  <>
+                    <button
+                      onClick={() => handleFacturer(rdv.id_rdv)}
+                      className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600"
+                    >
+                      💰 Marquer comme Facturé
+                    </button>
+                    <button
+                      onClick={() => handleReplanifier(rdv.id_rdv)}
+                      className="bg-orange-500 text-white px-3 py-1 rounded text-sm hover:bg-orange-600"
+                    >
+                      ↩️ Replanifier
+                    </button>
+                  </>
                 )}
                 <button
                   onClick={() => handleEdit(rdv)}
