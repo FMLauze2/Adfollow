@@ -10,6 +10,7 @@ import ContratsSuiviPage from "./pages/ContratsSuiviPage";
 import InstallationsPage from "./pages/InstallationsPage";
 import HistoriquePage from "./pages/HistoriquePage";
 import CalendrierPage from "./pages/CalendrierPage";
+import MesStatsPage from "./pages/MesStatsPage";
 import PraticiensPage from "./pages/PraticiensPage";
 import notificationManager from "./services/NotificationManager";
 
@@ -34,6 +35,7 @@ function App() {
           <Route path="/contrats/nouveau" element={<ContratFormPage />} />
           <Route path="/historique" element={<HistoriquePage />} />
           <Route path="/calendrier" element={<CalendrierPage />} />
+          <Route path="/mes-stats" element={<MesStatsPage />} />
           <Route path="/installations" element={<InstallationsPage />} />
           <Route path="/praticiens" element={<PraticiensPage />} />
         </Routes>

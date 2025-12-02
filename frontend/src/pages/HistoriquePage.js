@@ -35,7 +35,7 @@ const HistoriquePage = () => {
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
   const [statusFilter, setStatusFilter] = useState([]);
   const [typeRdvFilter, setTypeRdvFilter] = useState([]);
-  const [showGraphs, setShowGraphs] = useState(true);
+  const [showGraphs, setShowGraphs] = useState(false);
   const [rdvList, setRdvList] = useState([]);
 
   useEffect(() => {

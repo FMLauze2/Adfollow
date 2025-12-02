@@ -364,10 +364,18 @@ Merci de nous retourner le contrat signé et tamponné par email.`;
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <div className="p-6 pb-0">
-        <h1 className="text-2xl font-bold text-gray-800">Suivi des Contrats</h1>
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-2xl font-bold text-gray-800">Suivi des Contrats</h1>
+          <a
+            href="/contrats/nouveau"
+            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition flex items-center gap-2"
+          >
+            ➕ Nouveau contrat
+          </a>
+        </div>
         
               {/* BARRE DE RECHERCHE ET FILTRES */}
-              <div className="mt-4 flex flex-wrap gap-3 items-center">
+              <div className="flex flex-wrap gap-3 items-center">
                 <input
                   type="text"
                   placeholder="Rechercher par cabinet ou ville..."

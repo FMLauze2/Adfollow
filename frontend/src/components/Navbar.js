@@ -17,6 +17,7 @@ const Navbar = () => {
         <Link style={styles.link} to="/contrats/nouveau">Nouveau contrat</Link>
         <Link style={styles.link} to="/historique">Historique</Link>
         <Link style={styles.link} to="/calendrier">Calendrier</Link>
+        <Link style={styles.link} to="/mes-stats">Mes Stats</Link>
         <Link style={styles.link} to="/installations">Installations</Link>
         
         {/* Bouton Dark Mode */}

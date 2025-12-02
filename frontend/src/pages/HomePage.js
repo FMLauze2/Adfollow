@@ -7,6 +7,7 @@ const HomePage = () => {
   const [todayRdvCount, setTodayRdvCount] = useState(0);
   const [upcomingRdv, setUpcomingRdv] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [rendezvous, setRendezvous] = useState([]);
   
   // Recherche globale
   const [searchQuery, setSearchQuery] = useState("");
@@ -41,6 +42,7 @@ const HomePage = () => {
 
         // Fetch RDV pour aujourd'hui
         const rdvRes = await axios.get("http://localhost:4000/api/rendez-vous");
+        setRendezvous(rdvRes.data || []);
         const today = new Date().toISOString().split('T')[0];
         
         const todayRdv = (rdvRes.data || []).filter(rdv => {
@@ -268,6 +270,28 @@ const HomePage = () => {
           </div>
         )}
       </div>
+
+      {/* Badges visuels rapides */}
+      {!loading && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-6xl mx-auto mb-8">
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg p-4 shadow-lg">
+            <div className="text-3xl font-bold">{todayRdvCount}</div>
+            <div className="text-sm opacity-90">RDV aujourd'hui</div>
+          </div>
+          <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg p-4 shadow-lg">
+            <div className="text-3xl font-bold">{upcomingRdv.length}</div>
+            <div className="text-sm opacity-90">RDV prochains 14j</div>
+          </div>
+          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white rounded-lg p-4 shadow-lg">
+            <div className="text-3xl font-bold">{rendezvous.filter(r => r.statut === 'Effectué').length}</div>
+            <div className="text-sm opacity-90">À facturer</div>
+          </div>
+          <div className="bg-gradient-to-br from-red-500 to-red-600 text-white rounded-lg p-4 shadow-lg">
+            <div className="text-3xl font-bold">{overdueCount}</div>
+            <div className="text-sm opacity-90">Contrats en retard</div>
+          </div>
+        </div>
+      )}
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
         <div className="bg-white p-6 rounded shadow">
@@ -319,6 +343,19 @@ const HomePage = () => {
             className="inline-block bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded"
           >
             Gérer installations
+          </a>
+        </div>
+
+        <div className="bg-white p-6 rounded shadow border-2 border-indigo-300">
+          <h2 className="text-2xl font-semibold mb-2 text-indigo-600">➕ Nouveau RDV</h2>
+          <p className="text-gray-600 mb-4">
+            Créez rapidement un nouveau rendez-vous.
+          </p>
+          <a
+            href="/installations?new=1"
+            className="inline-block bg-indigo-500 hover:bg-indigo-600 text-white font-medium py-2 px-4 rounded"
+          >
+            Créer un RDV
           </a>
         </div>
       </div>
