@@ -218,4 +218,111 @@ router.get('/meta/categories', async (req, res) => {
   }
 });
 
+// Upload d'une image (conversion en base64)
+router.post('/upload-image', async (req, res) => {
+  try {
+    const { filename, base64Data, mimeType } = req.body;
+    
+    if (!filename || !base64Data || !mimeType) {
+      return res.status(400).json({ error: 'Données manquantes' });
+    }
+    
+    // Calculer la taille en bytes (base64 fait ~1.37x la taille originale)
+    const sizeBytes = Math.round((base64Data.length * 3) / 4);
+    
+    // Limiter à 2MB
+    if (sizeBytes > 2 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Image trop volumineuse (max 2MB)' });
+    }
+    
+    const result = await db.query(
+      `INSERT INTO knowledge_images (filename, base64_data, mime_type, size_bytes)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id_image, filename, mime_type, size_bytes, date_upload`,
+      [filename, base64Data, mimeType, sizeBytes]
+    );
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Erreur upload image:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Récupérer une image par ID
+router.get('/images/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await db.query(
+      'SELECT * FROM knowledge_images WHERE id_image = $1',
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Image non trouvée' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Erreur récupération image:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Lier une image à un article
+router.post('/:articleId/images/:imageId', async (req, res) => {
+  try {
+    const { articleId, imageId } = req.params;
+    const { ordre } = req.body;
+    
+    await db.query(
+      `INSERT INTO knowledge_article_images (id_article, id_image, ordre)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (id_article, id_image) DO UPDATE SET ordre = $3`,
+      [articleId, imageId, ordre || 0]
+    );
+    
+    res.json({ message: 'Image liée à l\'article' });
+  } catch (error) {
+    console.error('Erreur liaison image:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Récupérer les images d'un article
+router.get('/:articleId/images', async (req, res) => {
+  try {
+    const { articleId } = req.params;
+    
+    const result = await db.query(
+      `SELECT ki.*, kai.ordre
+       FROM knowledge_images ki
+       JOIN knowledge_article_images kai ON ki.id_image = kai.id_image
+       WHERE kai.id_article = $1
+       ORDER BY kai.ordre, ki.date_upload`,
+      [articleId]
+    );
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Erreur récupération images article:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Supprimer une image (et ses liaisons)
+router.delete('/images/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await db.query('DELETE FROM knowledge_images WHERE id_image = $1', [id]);
+    
+    res.json({ message: 'Image supprimée' });
+  } catch (error) {
+    console.error('Erreur suppression image:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 module.exports = router;
