@@ -211,6 +211,30 @@ router.post('/:id/complete', async (req, res) => {
       day: 'numeric' 
     });
     
+    // Parser les notes pour extraire les champs spécifiques
+    let notesData = {};
+    let generalNotes = rdv.notes || 'Intervention réalisée avec succès.';
+    try {
+      const parsed = JSON.parse(rdv.notes || '{}');
+      notesData = parsed.specificFields || {};
+      generalNotes = parsed.generalNotes || 'Intervention réalisée avec succès.';
+    } catch {
+      // Si ce n'est pas du JSON, c'est une note simple
+      generalNotes = rdv.notes || 'Intervention réalisée avec succès.';
+    }
+    
+    // Construire la section des détails spécifiques
+    let specificDetailsText = '';
+    if (Object.keys(notesData).length > 0) {
+      specificDetailsText = '\n\nDétails techniques:\n';
+      for (const [key, value] of Object.entries(notesData)) {
+        if (value) {
+          const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          specificDetailsText += `- ${label}: ${value}\n`;
+        }
+      }
+    }
+    
     const grcText = `Objet: ${rdv.type_rdv} - ${rdv.cabinet}
 
 Cabinet: ${rdv.cabinet}
@@ -218,10 +242,10 @@ Adresse: ${rdv.adresse}, ${rdv.code_postal} ${rdv.ville}
 Date intervention: ${dateFormatted} à ${rdv.heure_rdv}
 Praticien(s): ${praticiensList}
 
-Type d'intervention: ${rdv.type_rdv}
+Type d'intervention: ${rdv.type_rdv}${specificDetailsText}
 
 Compte-rendu:
-${rdv.notes || 'Intervention réalisée avec succès.'}
+${generalNotes}
 
 Statut: Effectué`;
     
