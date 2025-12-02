@@ -7,6 +7,7 @@ const InstallationsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("Tous");
   const [typeFilter, setTypeFilter] = useState("Tous");
+  const [cabinetHistoryModal, setCabinetHistoryModal] = useState(null);
   
   // Form state
   const [showForm, setShowForm] = useState(false);
@@ -160,6 +161,38 @@ const InstallationsPage = () => {
     });
     setSpecificFields(parsedSpecificFields);
     setShowForm(true);
+  };
+
+  const handleDuplicate = (rdv) => {
+    // Dupliquer un RDV existant
+    let parsedNotes = '';
+    let parsedSpecificFields = {};
+    
+    try {
+      const notesData = JSON.parse(rdv.notes || '{}');
+      parsedSpecificFields = notesData.specificFields || {};
+      parsedNotes = notesData.generalNotes || '';
+    } catch {
+      parsedNotes = rdv.notes || '';
+    }
+    
+    setEditingRdv(null); // Pas d'édition, c'est une création
+    setForm({
+      cabinet: rdv.cabinet,
+      date_rdv: '', // Laisser vide pour nouvelle date
+      heure_rdv: rdv.heure_rdv,
+      type_rdv: rdv.type_rdv,
+      adresse: rdv.adresse,
+      code_postal: rdv.code_postal,
+      ville: rdv.ville,
+      telephone: rdv.telephone || '',
+      email: rdv.email || '',
+      praticiens: rdv.praticiens || [],
+      notes: parsedNotes
+    });
+    setSpecificFields(parsedSpecificFields);
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (id) => {
@@ -377,7 +410,68 @@ const InstallationsPage = () => {
         </button>
       </div>
 
-      {/* Filtres */}
+      {/* Filtres rapides */}
+      <div className="mb-4 flex gap-2 flex-wrap">
+        <button
+          onClick={() => {
+            const today = new Date().toISOString().split('T')[0];
+            setSearchTerm('');
+            setStatusFilter('Tous');
+            setTypeFilter('Tous');
+            // Scroll vers le premier RDV d'aujourd'hui
+            setTimeout(() => {
+              const todayRdv = document.querySelector(`[data-date="${today}"]`);
+              if (todayRdv) todayRdv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+          }}
+          className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-2 rounded text-sm transition"
+        >
+          📅 Aujourd'hui
+        </button>
+        <button
+          onClick={() => {
+            setSearchTerm('');
+            setStatusFilter('Tous');
+            setTypeFilter('Tous');
+            // Filtrage semaine se fera dans le filtre côté rendu
+          }}
+          className="bg-green-100 hover:bg-green-200 text-green-800 px-3 py-2 rounded text-sm transition"
+        >
+          📆 Cette semaine
+        </button>
+        <button
+          onClick={() => {
+            setSearchTerm('');
+            setStatusFilter('Tous');
+            setTypeFilter('Tous');
+          }}
+          className="bg-purple-100 hover:bg-purple-200 text-purple-800 px-3 py-2 rounded text-sm transition"
+        >
+          📊 Ce mois
+        </button>
+        <button
+          onClick={() => {
+            setSearchTerm('');
+            setStatusFilter('Effectué');
+            setTypeFilter('Tous');
+          }}
+          className="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-3 py-2 rounded text-sm transition"
+        >
+          💰 À facturer
+        </button>
+        <button
+          onClick={() => {
+            setSearchTerm('');
+            setStatusFilter('Tous');
+            setTypeFilter('Tous');
+          }}
+          className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-2 rounded text-sm transition"
+        >
+          ↺ Réinitialiser
+        </button>
+      </div>
+
+      {/* Filtres avancés */}
       <div className="mb-6 flex gap-4 flex-wrap">
         <input
           type="text"
@@ -653,10 +747,17 @@ const InstallationsPage = () => {
       ) : (
         <div className="grid gap-4">
           {filteredRdv.map(rdv => (
-            <div key={rdv.id_rdv} className="bg-white border rounded-lg p-4 shadow">
+            <div key={rdv.id_rdv} className="bg-white border rounded-lg p-4 shadow" data-date={rdv.date_rdv.split('T')[0]}>
               <div className="flex justify-between items-start mb-2">
                 <div>
-                  <h3 className="text-lg font-semibold">{rdv.cabinet}</h3>
+                  <h3 
+                    className="text-lg font-semibold text-gray-800 hover:text-gray-600 cursor-pointer flex items-center gap-2"
+                    onClick={() => setCabinetHistoryModal(rdv.cabinet)}
+                    title="Voir l'historique de ce cabinet"
+                  >
+                    {rdv.cabinet}
+                    <span className="text-xs text-gray-400 hover:text-gray-600">📂</span>
+                  </h3>
                   <p className="text-sm text-gray-600">{rdv.type_rdv}</p>
                 </div>
                 {getStatusBadge(rdv.statut)}
@@ -680,6 +781,12 @@ const InstallationsPage = () => {
                   className="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600"
                 >
                   📅 Télécharger .ics
+                </button>
+                <button
+                  onClick={() => handleDuplicate(rdv)}
+                  className="bg-indigo-500 text-white px-3 py-1 rounded text-sm hover:bg-indigo-600"
+                >
+                  📋 Dupliquer
                 </button>
                 {rdv.statut === "Planifié" && (
                   <button
@@ -789,6 +896,86 @@ const InstallationsPage = () => {
             <button
               onClick={() => setCompleteModalRdv(null)}
               className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 w-full"
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Historique par cabinet */}
+      {cabinetHistoryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-2xl font-bold">📂 Historique - {cabinetHistoryModal}</h3>
+              <button
+                onClick={() => setCabinetHistoryModal(null)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              {rendezvous
+                .filter(rdv => rdv.cabinet === cabinetHistoryModal)
+                .sort((a, b) => new Date(b.date_rdv) - new Date(a.date_rdv))
+                .map(rdv => (
+                  <div key={rdv.id_rdv} className="border rounded-lg p-4 bg-gray-50">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h4 className="font-semibold text-lg">{rdv.type_rdv}</h4>
+                        <p className="text-sm text-gray-600">
+                          {rdv.date_rdv.split('T')[0].split('-').reverse().join('/')} à {rdv.heure_rdv}
+                        </p>
+                      </div>
+                      {getStatusBadge(rdv.statut)}
+                    </div>
+                    
+                    <div className="text-sm space-y-1">
+                      <p><strong>📍</strong> {rdv.ville}</p>
+                      {rdv.praticiens && rdv.praticiens.length > 0 && (
+                        <p><strong>👥</strong> {rdv.praticiens.map(p => `${p.prenom} ${p.nom}`).join(', ')}</p>
+                      )}
+                      {rdv.notes && (
+                        <p className="text-gray-700 mt-2">
+                          <strong>📝 Notes:</strong> {rdv.notes.length > 100 ? rdv.notes.substring(0, 100) + '...' : rdv.notes}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => {
+                          handleEdit(rdv);
+                          setCabinetHistoryModal(null);
+                        }}
+                        className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
+                      >
+                        ✏️ Modifier
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleDuplicate(rdv);
+                          setCabinetHistoryModal(null);
+                        }}
+                        className="bg-indigo-500 text-white px-3 py-1 rounded text-sm hover:bg-indigo-600"
+                      >
+                        📋 Dupliquer
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              
+              {rendezvous.filter(rdv => rdv.cabinet === cabinetHistoryModal).length === 0 && (
+                <p className="text-gray-500 text-center py-8">Aucun RDV trouvé pour ce cabinet</p>
+              )}
+            </div>
+
+            <button
+              onClick={() => setCabinetHistoryModal(null)}
+              className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 w-full mt-4"
             >
               Fermer
             </button>
