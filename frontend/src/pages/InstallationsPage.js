@@ -486,8 +486,25 @@ const InstallationsPage = () => {
                   type="text"
                   required
                   value={form.code_postal}
-                  onChange={(e) => setForm({ ...form, code_postal: e.target.value })}
+                  onChange={async (e) => {
+                    const cp = e.target.value;
+                    setForm({ ...form, code_postal: cp });
+                    
+                    // Auto-complétion ville si CP valide (5 chiffres)
+                    if (cp.length === 5 && /^\d{5}$/.test(cp)) {
+                      try {
+                        const response = await fetch(`https://geo.api.gouv.fr/communes?codePostal=${cp}&fields=nom&format=json`);
+                        const data = await response.json();
+                        if (data && data.length > 0) {
+                          setForm(prev => ({ ...prev, ville: data[0].nom }));
+                        }
+                      } catch (error) {
+                        console.error("Erreur API Geo:", error);
+                      }
+                    }
+                  }}
                   className="w-full border px-3 py-2 rounded"
+                  placeholder="75001"
                 />
               </div>
               <div>

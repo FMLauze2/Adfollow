@@ -122,9 +122,26 @@ const ContratsForm = () => {
           <input
             type="text"
             value={codePostal}
-            onChange={e => setCodePostal(e.target.value)}
+            onChange={async (e) => {
+              const cp = e.target.value;
+              setCodePostal(cp);
+              
+              // Auto-complétion ville si CP valide (5 chiffres)
+              if (cp.length === 5 && /^\d{5}$/.test(cp)) {
+                try {
+                  const response = await fetch(`https://geo.api.gouv.fr/communes?codePostal=${cp}&fields=nom&format=json`);
+                  const data = await response.json();
+                  if (data && data.length > 0) {
+                    setVille(data[0].nom);
+                  }
+                } catch (error) {
+                  console.error("Erreur API Geo:", error);
+                }
+              }
+            }}
             required
             disabled={loading}
+            placeholder="75001"
             className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-100"
           />
         </div>
