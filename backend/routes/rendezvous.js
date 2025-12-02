@@ -426,7 +426,19 @@ router.get('/:id/ics', async (req, res) => {
     
     // Envoyer le fichier
     const cabinetSafe = rdv.cabinet.replace(/[^a-z0-9]/gi, '_');
-    const dateSafe = rdv.date_rdv.toString().replace(/[^0-9-]/g, '');
+    
+    // Formatter la date pour le nom de fichier
+    let dateSafe;
+    if (typeof rdv.date_rdv === 'string') {
+      dateSafe = rdv.date_rdv.split('T')[0];
+    } else {
+      const d = new Date(rdv.date_rdv);
+      const year = d.getUTCFullYear();
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      dateSafe = `${year}-${month}-${day}`;
+    }
+    
     const filename = `RDV_${cabinetSafe}_${dateSafe}.ics`;
     res.setHeader('Content-Type', 'text/calendar');
     res.setHeader('Content-Disposition', 'attachment; filename=' + filename);
