@@ -7,6 +7,23 @@ const HomePage = () => {
   const [todayRdvCount, setTodayRdvCount] = useState(0);
   const [upcomingRdv, setUpcomingRdv] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Recherche globale
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState({ contrats: [], rdv: [] });
+  const [showResults, setShowResults] = useState(false);
+  const [searching, setSearching] = useState(false);
+
+  // Fermer les résultats en cliquant dehors
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('.search-container')) {
+        setShowResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -63,6 +80,51 @@ const HomePage = () => {
     fetchData();
   }, [overdueDays]);
 
+  const handleSearch = async (query) => {
+    if (query.trim().length < 2) return;
+    
+    setSearching(true);
+    try {
+      const [contratsRes, rdvRes] = await Promise.all([
+        axios.get("http://localhost:4000/api/contrats"),
+        axios.get("http://localhost:4000/api/rendez-vous")
+      ]);
+
+      const searchLower = query.toLowerCase().trim();
+
+      // Recherche dans les contrats
+      const matchedContrats = (contratsRes.data || []).filter(contrat => {
+        const cabinetMatch = contrat.cabinet?.toLowerCase().includes(searchLower);
+        const villeMatch = contrat.ville?.toLowerCase().includes(searchLower);
+        const cpMatch = contrat.code_postal?.includes(searchLower);
+        const praticienMatch = contrat.praticiens?.some(p => {
+          if (typeof p === 'string') return p.toLowerCase().includes(searchLower);
+          return `${p.prenom} ${p.nom}`.toLowerCase().includes(searchLower);
+        });
+        return cabinetMatch || villeMatch || cpMatch || praticienMatch;
+      }).slice(0, 5); // Limiter à 5 résultats
+
+      // Recherche dans les RDV
+      const matchedRdv = (rdvRes.data || []).filter(rdv => {
+        const cabinetMatch = rdv.cabinet?.toLowerCase().includes(searchLower);
+        const villeMatch = rdv.ville?.toLowerCase().includes(searchLower);
+        const cpMatch = rdv.code_postal?.includes(searchLower);
+        const typeMatch = rdv.type_rdv?.toLowerCase().includes(searchLower);
+        const praticienMatch = rdv.praticiens?.some(p => 
+          `${p.prenom} ${p.nom}`.toLowerCase().includes(searchLower)
+        );
+        return cabinetMatch || villeMatch || cpMatch || typeMatch || praticienMatch;
+      }).slice(0, 5); // Limiter à 5 résultats
+
+      setSearchResults({ contrats: matchedContrats, rdv: matchedRdv });
+      setShowResults(true);
+    } catch (error) {
+      console.error("Erreur recherche:", error);
+    } finally {
+      setSearching(false);
+    }
+  };
+
   return (
     <div className="text-center py-12">
       {/* Bannières Notifications */}
@@ -105,9 +167,107 @@ const HomePage = () => {
       </div>
 
       <h1 className="text-4xl font-bold mb-4 text-gray-800">Bienvenue sur Adfollow</h1>
-      <p className="text-lg text-gray-600 mb-8">
+      <p className="text-lg text-gray-600 mb-4">
         Gérez vos contrats et installations facilement
       </p>
+
+      {/* Barre de recherche globale */}
+      <div className="max-w-3xl mx-auto mb-8 relative search-container">
+        <div className="relative">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              if (e.target.value.trim().length >= 2) {
+                handleSearch(e.target.value);
+              } else {
+                setShowResults(false);
+                setSearchResults({ contrats: [], rdv: [] });
+              }
+            }}
+            onFocus={() => searchQuery.trim().length >= 2 && setShowResults(true)}
+            placeholder="🔍 Rechercher un cabinet, praticien, ville, code postal..."
+            className="w-full px-6 py-4 text-lg border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 shadow-lg"
+          />
+          {searching && (
+            <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+              <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+            </div>
+          )}
+        </div>
+
+        {/* Résultats de recherche */}
+        {showResults && (searchResults.contrats.length > 0 || searchResults.rdv.length > 0) && (
+          <div className="absolute w-full mt-2 bg-white border-2 border-gray-200 rounded-lg shadow-xl max-h-[500px] overflow-y-auto z-50 text-left">
+            {/* Contrats */}
+            {searchResults.contrats.length > 0 && (
+              <div className="p-4 border-b">
+                <h3 className="font-bold text-blue-600 mb-3">📄 Contrats ({searchResults.contrats.length})</h3>
+                <div className="space-y-2">
+                  {searchResults.contrats.map(contrat => (
+                    <a
+                      key={contrat.id_contrat}
+                      href="/contrats"
+                      className="block p-3 hover:bg-blue-50 rounded transition"
+                      onClick={() => setShowResults(false)}
+                    >
+                      <div className="font-semibold text-gray-800">{contrat.cabinet}</div>
+                      <div className="text-sm text-gray-600">
+                        {contrat.ville} · {contrat.prix}€ · 
+                        <span className={`ml-1 ${contrat.statut === 'Signé' ? 'text-green-600' : 'text-orange-600'}`}>
+                          {contrat.statut}
+                        </span>
+                      </div>
+                      {contrat.praticiens && contrat.praticiens.length > 0 && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          👥 {contrat.praticiens.map(p => typeof p === 'string' ? p : `${p.prenom} ${p.nom}`).join(', ')}
+                        </div>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* RDV */}
+            {searchResults.rdv.length > 0 && (
+              <div className="p-4">
+                <h3 className="font-bold text-green-600 mb-3">📅 Rendez-vous ({searchResults.rdv.length})</h3>
+                <div className="space-y-2">
+                  {searchResults.rdv.map(rdv => (
+                    <a
+                      key={rdv.id_rdv}
+                      href="/installations"
+                      className="block p-3 hover:bg-green-50 rounded transition"
+                      onClick={() => setShowResults(false)}
+                    >
+                      <div className="font-semibold text-gray-800">{rdv.cabinet}</div>
+                      <div className="text-sm text-gray-600">
+                        {rdv.type_rdv} · {rdv.ville} · {rdv.date_rdv.split('T')[0].split('-').reverse().join('/')} à {rdv.heure_rdv}
+                      </div>
+                      <span className={`inline-block text-xs px-2 py-1 rounded mt-1 ${
+                        rdv.statut === 'Planifié' ? 'bg-blue-100 text-blue-800' :
+                        rdv.statut === 'Effectué' ? 'bg-green-100 text-green-800' :
+                        rdv.statut === 'Facturé' ? 'bg-purple-100 text-purple-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {rdv.statut}
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {searchResults.contrats.length === 0 && searchResults.rdv.length === 0 && searchQuery.trim().length >= 2 && (
+              <div className="p-6 text-center text-gray-500">
+                Aucun résultat trouvé pour "{searchQuery}"
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
         <div className="bg-white p-6 rounded shadow">
@@ -137,15 +297,15 @@ const HomePage = () => {
         </div>
 
         <div className="bg-white p-6 rounded shadow">
-          <h2 className="text-2xl font-semibold mb-2 text-purple-600">Praticiens</h2>
+          <h2 className="text-2xl font-semibold mb-2 text-purple-600">Historique</h2>
           <p className="text-gray-600 mb-4">
-            Gérez la liste de vos praticiens et leurs informations.
+            Consultez l'historique complet de tous vos contrats et RDV.
           </p>
           <a
-            href="/praticiens"
+            href="/historique"
             className="inline-block bg-purple-500 hover:bg-purple-600 text-white font-medium py-2 px-4 rounded"
           >
-            Gérer praticiens
+            Voir l'historique
           </a>
         </div>
 

@@ -463,7 +463,24 @@ Merci de nous retourner le contrat signé et tamponné par email.`;
                             <input
                               type="text"
                               value={editForm.code_postal}
-                              onChange={(e) => setEditForm({...editForm, code_postal: e.target.value})}
+                              onChange={async (e) => {
+                                const cp = e.target.value;
+                                setEditForm({...editForm, code_postal: cp});
+                                
+                                // Auto-complétion ville si CP valide (5 chiffres)
+                                if (cp.length === 5 && /^\d{5}$/.test(cp)) {
+                                  try {
+                                    const response = await fetch(`https://geo.api.gouv.fr/communes?codePostal=${cp}&fields=nom&format=json`);
+                                    const data = await response.json();
+                                    if (data && data.length > 0) {
+                                      setEditForm(prev => ({...prev, ville: data[0].nom}));
+                                    }
+                                  } catch (error) {
+                                    console.error("Erreur API Geo:", error);
+                                  }
+                                }
+                              }}
+                              placeholder="75001"
                               className="w-full border border-gray-300 rounded px-3 py-2"
                             />
                           </div>
