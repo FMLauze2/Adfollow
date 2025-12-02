@@ -18,6 +18,7 @@ const praticienRoutes = require('./routes/praticiens');
 const installationRoutes = require('./routes/installations');
 const contratRoutes = require('./routes/contrats');
 const rendezvousRoutes = require('./routes/rendezvous');
+const todoRoutes = require('./routes/todos');
 
 // Use routes
 app.use('/api/cabinets', cabinetRoutes);
@@ -25,6 +26,7 @@ app.use('/api/praticiens', praticienRoutes);
 app.use('/api/installations', installationRoutes);
 app.use('/api/contrats', contratRoutes);
 app.use('/api/rendez-vous', rendezvousRoutes);
+app.use('/api/todos', todoRoutes);
 
 app.listen(4000, () => {
   console.log('Server running on http://localhost:4000');

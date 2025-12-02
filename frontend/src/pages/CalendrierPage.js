@@ -7,10 +7,24 @@ function CalendrierPage() {
   const [loading, setLoading] = useState(true);
   const [selectedRdv, setSelectedRdv] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  
+  // Todo list
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [showTodoPanel, setShowTodoPanel] = useState(false);
+  const [todos, setTodos] = useState([]);
+  const [newTodoText, setNewTodoText] = useState('');
+  const [loadingTodos, setLoadingTodos] = useState(false);
 
   useEffect(() => {
     fetchRdv();
+    autoReportPastTodos();
   }, []);
+
+  useEffect(() => {
+    if (selectedDate) {
+      fetchTodosForDate(selectedDate);
+    }
+  }, [selectedDate]);
 
   const fetchRdv = async () => {
     setLoading(true);
@@ -22,6 +36,69 @@ function CalendrierPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchTodosForDate = async (date) => {
+    setLoadingTodos(true);
+    try {
+      const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      const response = await axios.get(`http://localhost:4000/api/todos?date=${dateString}`);
+      setTodos(response.data || []);
+    } catch (error) {
+      console.error("Erreur chargement todos:", error);
+    } finally {
+      setLoadingTodos(false);
+    }
+  };
+
+  const autoReportPastTodos = async () => {
+    try {
+      await axios.post("http://localhost:4000/api/todos/auto-report-past");
+    } catch (error) {
+      console.error("Erreur auto-report todos:", error);
+    }
+  };
+
+  const addTodo = async () => {
+    if (!newTodoText.trim() || !selectedDate) return;
+    
+    try {
+      const dateString = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+      await axios.post("http://localhost:4000/api/todos", {
+        texte: newTodoText,
+        date_todo: dateString
+      });
+      setNewTodoText('');
+      fetchTodosForDate(selectedDate);
+    } catch (error) {
+      console.error("Erreur création todo:", error);
+      alert("Erreur lors de la création de la tâche");
+    }
+  };
+
+  const toggleTodo = async (id) => {
+    try {
+      await axios.post(`http://localhost:4000/api/todos/${id}/toggle`);
+      fetchTodosForDate(selectedDate);
+    } catch (error) {
+      console.error("Erreur toggle todo:", error);
+    }
+  };
+
+  const deleteTodo = async (id) => {
+    if (!window.confirm("Supprimer cette tâche ?")) return;
+    
+    try {
+      await axios.delete(`http://localhost:4000/api/todos/${id}`);
+      fetchTodosForDate(selectedDate);
+    } catch (error) {
+      console.error("Erreur suppression todo:", error);
+    }
+  };
+
+  const handleDayClick = (date) => {
+    setSelectedDate(date);
+    setShowTodoPanel(true);
   };
 
   // Navigation entre les mois
@@ -67,7 +144,11 @@ function CalendrierPage() {
   const getRdvForDate = (date) => {
     if (!date) return [];
     
-    const dateString = date.toISOString().split('T')[0];
+    // Formater la date localement sans conversion timezone
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateString = `${year}-${month}-${day}`;
     
     return rdvList.filter(rdv => {
       const rdvDate = rdv.date_rdv.split('T')[0];
@@ -163,15 +244,17 @@ function CalendrierPage() {
             return (
               <div
                 key={index}
-                className={`h-32 border rounded-lg p-2 overflow-y-auto ${
+                className={`h-32 border rounded-lg p-2 overflow-y-auto cursor-pointer hover:shadow-md transition ${
                   isToday ? 'bg-blue-50 border-blue-400 border-2' : 'bg-white border-gray-200'
                 }`}
+                onClick={() => handleDayClick(date)}
               >
                 {/* Numéro du jour */}
-                <div className={`text-right font-semibold mb-1 ${
+                <div className={`flex justify-between items-start mb-1 ${
                   isToday ? 'text-blue-600' : 'text-gray-700'
                 }`}>
-                  {dayNumber}
+                  <span className="text-lg">📝</span>
+                  <span className="font-semibold">{dayNumber}</span>
                 </div>
 
                 {/* RDV du jour */}
@@ -225,6 +308,115 @@ function CalendrierPage() {
           </div>
         </div>
       </div>
+
+      {/* Panneau latéral Todo List */}
+      {showTodoPanel && selectedDate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-end z-50"
+             onClick={() => setShowTodoPanel(false)}>
+          <div className="bg-white w-full max-w-md h-full overflow-y-auto shadow-2xl"
+               onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white border-b p-4 z-10">
+              <div className="flex justify-between items-center mb-2">
+                <h2 className="text-2xl font-bold text-gray-800">📝 Todo List</h2>
+                <button
+                  onClick={() => setShowTodoPanel(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+              <p className="text-sm text-gray-600">
+                {selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
+            </div>
+
+            <div className="p-4">
+              {/* Formulaire ajout todo */}
+              <div className="mb-4">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newTodoText}
+                    onChange={(e) => setNewTodoText(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && addTodo()}
+                    placeholder="Nouvelle tâche..."
+                    className="flex-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={addTodo}
+                    disabled={!newTodoText.trim()}
+                    className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ➕
+                  </button>
+                </div>
+              </div>
+
+              {/* Liste des todos */}
+              {loadingTodos ? (
+                <p className="text-center text-gray-500 py-4">Chargement...</p>
+              ) : todos.length === 0 ? (
+                <p className="text-center text-gray-400 py-8">Aucune tâche pour ce jour</p>
+              ) : (
+                <div className="space-y-2">
+                  {todos.map(todo => (
+                    <div
+                      key={todo.id_todo}
+                      className={`flex items-center gap-3 p-3 rounded-lg border transition ${
+                        todo.completed 
+                          ? 'bg-green-50 border-green-200' 
+                          : 'bg-white border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={todo.completed}
+                        onChange={() => toggleTodo(todo.id_todo)}
+                        className="w-5 h-5 cursor-pointer accent-green-500"
+                      />
+                      <span
+                        className={`flex-1 ${
+                          todo.completed 
+                            ? 'text-gray-500 line-through' 
+                            : 'text-gray-800'
+                        }`}
+                      >
+                        {todo.texte}
+                      </span>
+                      <button
+                        onClick={() => deleteTodo(todo.id_todo)}
+                        className="text-red-500 hover:text-red-700 text-lg"
+                        title="Supprimer"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Statistiques */}
+              {todos.length > 0 && (
+                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                  <div className="text-sm text-gray-600">
+                    <p className="mb-1">
+                      <strong>{todos.filter(t => t.completed).length}</strong> sur <strong>{todos.length}</strong> tâche(s) complétée(s)
+                    </p>
+                    <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                      <div
+                        className="bg-green-500 h-2 rounded-full transition-all"
+                        style={{
+                          width: `${todos.length > 0 ? (todos.filter(t => t.completed).length / todos.length) * 100 : 0}%`
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal détails RDV */}
       {showModal && selectedRdv && (
