@@ -14,6 +14,11 @@ const HomePage = () => {
   const [searchResults, setSearchResults] = useState({ contrats: [], rdv: [] });
   const [showResults, setShowResults] = useState(false);
   const [searching, setSearching] = useState(false);
+  
+  // Todo list du jour
+  const [todayTodos, setTodayTodos] = useState([]);
+  const [newTodoText, setNewTodoText] = useState('');
+  const [loadingTodos, setLoadingTodos] = useState(false);
 
   // Fermer les résultats en cliquant dehors
   useEffect(() => {
@@ -40,10 +45,14 @@ const HomePage = () => {
         }, 0);
         setOverdueCount(count);
 
-        // Fetch RDV pour aujourd'hui
+        // Fetch RDV et todos pour aujourd'hui
+        const today = new Date().toISOString().split('T')[0];
+        
+        const todosRes = await axios.get(`http://localhost:4000/api/todos?date=${today}`);
+        setTodayTodos(todosRes.data || []);
+
         const rdvRes = await axios.get("http://localhost:4000/api/rendez-vous");
         setRendezvous(rdvRes.data || []);
-        const today = new Date().toISOString().split('T')[0];
         
         const todayRdv = (rdvRes.data || []).filter(rdv => {
           if (!rdv.date_rdv) return false;
@@ -124,6 +133,52 @@ const HomePage = () => {
       console.error("Erreur recherche:", error);
     } finally {
       setSearching(false);
+    }
+  };
+
+  const fetchTodayTodos = async () => {
+    const today = new Date().toISOString().split('T')[0];
+    try {
+      const todosRes = await axios.get(`http://localhost:4000/api/todos?date=${today}`);
+      setTodayTodos(todosRes.data || []);
+    } catch (error) {
+      console.error("Erreur chargement todos:", error);
+    }
+  };
+
+  const addTodo = async () => {
+    if (!newTodoText.trim()) return;
+    
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      await axios.post("http://localhost:4000/api/todos", {
+        texte: newTodoText,
+        date_todo: today
+      });
+      setNewTodoText('');
+      fetchTodayTodos();
+    } catch (error) {
+      console.error("Erreur création todo:", error);
+    }
+  };
+
+  const toggleTodo = async (id) => {
+    try {
+      await axios.post(`http://localhost:4000/api/todos/${id}/toggle`);
+      fetchTodayTodos();
+    } catch (error) {
+      console.error("Erreur toggle todo:", error);
+    }
+  };
+
+  const deleteTodo = async (id) => {
+    if (!window.confirm("Supprimer cette tâche ?")) return;
+    
+    try {
+      await axios.delete(`http://localhost:4000/api/todos/${id}`);
+      fetchTodayTodos();
+    } catch (error) {
+      console.error("Erreur suppression todo:", error);
     }
   };
 
@@ -292,6 +347,104 @@ const HomePage = () => {
           </div>
         </div>
       )}
+
+      {/* Todo List du jour */}
+      <div className="max-w-6xl mx-auto mb-8">
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-bold text-gray-800">📝 Ma liste du jour</h2>
+            <a 
+              href="/calendrier" 
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              Voir calendrier →
+            </a>
+          </div>
+
+          {/* Formulaire ajout todo */}
+          <div className="mb-4">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newTodoText}
+                onChange={(e) => setNewTodoText(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && addTodo()}
+                placeholder="Ajouter une tâche pour aujourd'hui..."
+                className="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={addTodo}
+                disabled={!newTodoText.trim()}
+                className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                ➕ Ajouter
+              </button>
+            </div>
+          </div>
+
+          {/* Liste des todos */}
+          {loadingTodos ? (
+            <p className="text-center text-gray-500 py-4">Chargement...</p>
+          ) : todayTodos.length === 0 ? (
+            <p className="text-center text-gray-400 py-8">Aucune tâche pour aujourd'hui</p>
+          ) : (
+            <div className="space-y-2">
+              {todayTodos.map(todo => (
+                <div
+                  key={todo.id_todo}
+                  className={`flex items-center gap-3 p-3 rounded-lg border transition ${
+                    todo.completed 
+                      ? 'bg-green-50 border-green-200' 
+                      : 'bg-white border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={todo.completed}
+                    onChange={() => toggleTodo(todo.id_todo)}
+                    className="w-5 h-5 cursor-pointer accent-green-500"
+                  />
+                  <span
+                    className={`flex-1 text-left ${
+                      todo.completed 
+                        ? 'text-gray-500 line-through' 
+                        : 'text-gray-800'
+                    }`}
+                  >
+                    {todo.texte}
+                  </span>
+                  <button
+                    onClick={() => deleteTodo(todo.id_todo)}
+                    className="text-red-500 hover:text-red-700 text-lg"
+                    title="Supprimer"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Statistiques */}
+          {todayTodos.length > 0 && (
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-600">
+                <p className="mb-1">
+                  <strong>{todayTodos.filter(t => t.completed).length}</strong> sur <strong>{todayTodos.length}</strong> tâche(s) complétée(s)
+                </p>
+                <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                  <div
+                    className="bg-green-500 h-2 rounded-full transition-all"
+                    style={{
+                      width: `${todayTodos.length > 0 ? (todayTodos.filter(t => t.completed).length / todayTodos.length) * 100 : 0}%`
+                    }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
         <div className="bg-white p-6 rounded shadow">

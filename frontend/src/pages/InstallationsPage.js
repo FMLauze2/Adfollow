@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { getChecklistForType, getChecklistProgress } from "../utils/checklists";
 
 const InstallationsPage = () => {
   const [rendezvous, setRendezvous] = useState([]);
@@ -35,9 +36,14 @@ const InstallationsPage = () => {
   const [completeModalRdv, setCompleteModalRdv] = useState(null);
   const [grcText, setGrcText] = useState("");
   const [copiedGrc, setCopiedGrc] = useState(false);
+  const [copiedRdvId, setCopiedRdvId] = useState(null);
   const [showContratForm, setShowContratForm] = useState(false);
   const [contratPrix, setContratPrix] = useState("");
   const [creatingContrat, setCreatingContrat] = useState(false);
+  const [checklistModalRdv, setChecklistModalRdv] = useState(null);
+  const [currentChecklist, setCurrentChecklist] = useState([]);
+  const [previewGrcModal, setPreviewGrcModal] = useState(null);
+  const [previewGrcText, setPreviewGrcText] = useState("");
 
   useEffect(() => {
     fetchRendezvous();
@@ -298,6 +304,72 @@ const InstallationsPage = () => {
     navigator.clipboard.writeText(grcText);
     setCopiedGrc(true);
     setTimeout(() => setCopiedGrc(false), 2000);
+  };
+
+  const generateGrcText = (rdv) => {
+    let notesData = {};
+    try {
+      notesData = JSON.parse(rdv.notes || '{}');
+    } catch {
+      notesData = { specificFields: {}, generalNotes: rdv.notes || '' };
+    }
+
+    const specificFields = notesData.specificFields || {};
+    const generalNotes = notesData.generalNotes || rdv.notes || '';
+    const checklist = notesData.checklist || [];
+
+    let text = `RDV du ${rdv.date_rdv.split('T')[0].split('-').reverse().join('/')} à ${rdv.heure_rdv}\n`;
+    text += `Cabinet: ${rdv.cabinet}\n`;
+    text += `Type: ${rdv.type_rdv}\n`;
+    text += `Adresse: ${rdv.adresse}, ${rdv.code_postal} ${rdv.ville}\n\n`;
+
+    if (rdv.praticiens && rdv.praticiens.length > 0) {
+      text += `Praticiens:\n`;
+      rdv.praticiens.forEach(p => {
+        text += `- ${p.prenom} ${p.nom}\n`;
+      });
+      text += `\n`;
+    }
+
+    if (Object.keys(specificFields).length > 0) {
+      text += `Détails techniques:\n`;
+      for (const [key, value] of Object.entries(specificFields)) {
+        if (value) {
+          const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          text += `- ${label}: ${value}\n`;
+        }
+      }
+      text += `\n`;
+    }
+
+    // Afficher la checklist si elle existe
+    if (checklist.length > 0) {
+      text += `Checklist d'intervention:\n`;
+      checklist.forEach(item => {
+        const status = item.checked ? '✓' : '☐';
+        text += `${status} ${item.label}\n`;
+      });
+      text += `\n`;
+    }
+
+    if (generalNotes) {
+      text += `Notes:\n${generalNotes}`;
+    }
+
+    return text;
+  };
+
+  const copyGrcTextFromRdv = (rdv) => {
+    const text = generateGrcText(rdv);
+    setPreviewGrcText(text);
+    setPreviewGrcModal(rdv);
+    setCopiedRdvId(null);
+  };
+
+  const copyPreviewGrcToClipboard = () => {
+    navigator.clipboard.writeText(previewGrcText);
+    setCopiedRdvId(previewGrcModal?.id_rdv);
+    setTimeout(() => setCopiedRdvId(null), 2000);
   };
 
   const addPraticien = () => {
@@ -783,6 +855,33 @@ const InstallationsPage = () => {
                   📅 Télécharger .ics
                 </button>
                 <button
+                  onClick={() => copyGrcTextFromRdv(rdv)}
+                  className="bg-cyan-500 text-white px-3 py-1 rounded text-sm hover:bg-cyan-600"
+                >
+                  📋 Texte GRC
+                </button>
+                <button
+                  onClick={() => {
+                    const template = getChecklistForType(rdv.type_rdv);
+                    // Charger la checklist sauvegardée ou utiliser le template
+                    let savedChecklist = [];
+                    try {
+                      const notesData = JSON.parse(rdv.notes || '{}');
+                      savedChecklist = notesData.checklist || [];
+                    } catch {}
+                    
+                    if (savedChecklist.length > 0) {
+                      setCurrentChecklist(savedChecklist);
+                    } else {
+                      setCurrentChecklist(template.map(item => ({ ...item, checked: false })));
+                    }
+                    setChecklistModalRdv(rdv);
+                  }}
+                  className="bg-teal-500 text-white px-3 py-1 rounded text-sm hover:bg-teal-600"
+                >
+                  ✓ Checklist
+                </button>
+                <button
                   onClick={() => handleDuplicate(rdv)}
                   className="bg-indigo-500 text-white px-3 py-1 rounded text-sm hover:bg-indigo-600"
                 >
@@ -979,6 +1078,261 @@ const InstallationsPage = () => {
             >
               Fermer
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Prévisualisation Texte GRC */}
+      {previewGrcModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Texte GRC - {previewGrcModal.cabinet}</h3>
+              <button
+                onClick={() => setPreviewGrcModal(null)}
+                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-sm font-medium">Texte à copier:</label>
+                <button
+                  onClick={copyPreviewGrcToClipboard}
+                  className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
+                >
+                  {copiedRdvId === previewGrcModal.id_rdv ? "✓ Copié !" : "📋 Copier"}
+                </button>
+              </div>
+              <textarea
+                value={previewGrcText}
+                readOnly
+                rows="15"
+                className="w-full border px-3 py-2 rounded bg-gray-50 font-mono text-sm"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setPreviewGrcModal(null)}
+                className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Prévisualisation Texte GRC */}
+      {previewGrcModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Texte GRC - {previewGrcModal.cabinet}</h3>
+              <button
+                onClick={() => setPreviewGrcModal(null)}
+                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-sm font-medium">Texte à copier:</label>
+                <button
+                  onClick={copyPreviewGrcToClipboard}
+                  className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
+                >
+                  {copiedRdvId === previewGrcModal.id_rdv ? "✓ Copié !" : "📋 Copier"}
+                </button>
+              </div>
+              <textarea
+                value={previewGrcText}
+                readOnly
+                rows="15"
+                className="w-full border px-3 py-2 rounded bg-gray-50 font-mono text-sm"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setPreviewGrcModal(null)}
+                className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Prévisualisation Texte GRC */}
+      {previewGrcModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Texte GRC - {previewGrcModal.cabinet}</h3>
+              <button
+                onClick={() => setPreviewGrcModal(null)}
+                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-sm font-medium">Texte à copier:</label>
+                <button
+                  onClick={copyPreviewGrcToClipboard}
+                  className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
+                >
+                  {copiedRdvId === previewGrcModal.id_rdv ? "✓ Copié !" : "📋 Copier"}
+                </button>
+              </div>
+              <textarea
+                value={previewGrcText}
+                readOnly
+                rows="15"
+                className="w-full border px-3 py-2 rounded bg-gray-50 font-mono text-sm"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setPreviewGrcModal(null)}
+                className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Checklist */}
+      {checklistModalRdv && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-2xl font-bold">✓ Checklist - {checklistModalRdv.type_rdv}</h3>
+                <p className="text-sm text-gray-600">{checklistModalRdv.cabinet}</p>
+              </div>
+              <button
+                onClick={() => setChecklistModalRdv(null)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Barre de progression */}
+            <div className="mb-6">
+              <div className="flex justify-between text-sm mb-1">
+                <span className="font-semibold">Progression</span>
+                <span>{getChecklistProgress(currentChecklist)}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div
+                  className="bg-teal-500 h-full rounded-full transition-all duration-300"
+                  style={{ width: `${getChecklistProgress(currentChecklist)}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* Liste des tâches */}
+            <div className="space-y-2 mb-6">
+              {currentChecklist.map((item, index) => (
+                <label
+                  key={item.id}
+                  className={`flex items-start gap-3 p-3 rounded border-2 cursor-pointer transition ${
+                    item.checked 
+                      ? 'bg-teal-50 border-teal-300' 
+                      : 'bg-white border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={item.checked || false}
+                    onChange={(e) => {
+                      const updated = [...currentChecklist];
+                      updated[index] = { ...updated[index], checked: e.target.checked };
+                      setCurrentChecklist(updated);
+                    }}
+                    className="mt-1 w-5 h-5 text-teal-500 rounded focus:ring-teal-500"
+                  />
+                  <span className={`flex-1 ${item.checked ? 'line-through text-gray-500' : 'text-gray-800'}`}>
+                    {item.label}
+                  </span>
+                </label>
+              ))}
+
+              {currentChecklist.length === 0 && (
+                <p className="text-gray-500 text-center py-8">Aucune checklist disponible pour ce type de RDV</p>
+              )}
+            </div>
+
+            {/* Boutons d'action */}
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  try {
+                    // Sauvegarder la checklist dans les notes du RDV
+                    let existingNotes = {};
+                    try {
+                      existingNotes = JSON.parse(checklistModalRdv.notes || '{}');
+                    } catch {}
+
+                    const updatedNotes = {
+                      ...existingNotes,
+                      checklist: currentChecklist
+                    };
+
+                    await axios.put(`http://localhost:4000/api/rendez-vous/${checklistModalRdv.id_rdv}`, {
+                      ...checklistModalRdv,
+                      notes: JSON.stringify(updatedNotes)
+                    });
+
+                    alert("✓ Checklist sauvegardée !");
+                    setChecklistModalRdv(null);
+                    fetchRendezvous();
+                  } catch (error) {
+                    console.error("Erreur sauvegarde checklist:", error);
+                    alert("Erreur lors de la sauvegarde");
+                  }
+                }}
+                className="flex-1 bg-teal-500 text-white px-4 py-2 rounded hover:bg-teal-600 transition"
+              >
+                💾 Sauvegarder
+              </button>
+              <button
+                onClick={() => {
+                  const template = getChecklistForType(checklistModalRdv.type_rdv);
+                  setCurrentChecklist(template.map(item => ({ ...item, checked: false })));
+                }}
+                className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 transition"
+              >
+                ↺ Réinitialiser
+              </button>
+              <button
+                onClick={() => setChecklistModalRdv(null)}
+                className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 transition"
+              >
+                Fermer
+              </button>
+            </div>
+
+            {getChecklistProgress(currentChecklist) === 100 && (
+              <div className="mt-4 p-4 bg-green-50 border-2 border-green-300 rounded-lg text-center">
+                <span className="text-2xl">🎉</span>
+                <p className="font-semibold text-green-800">Checklist complétée !</p>
+              </div>
+            )}
           </div>
         </div>
       )}
