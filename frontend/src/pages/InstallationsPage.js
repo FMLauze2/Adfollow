@@ -448,17 +448,43 @@ const InstallationsPage = () => {
     setSpecificFields({});
   };
 
-  const getStatusBadge = (statut) => {
+  const handleChangeStatut = async (idRdv, newStatut) => {
+    try {
+      await axios.put(`http://localhost:4000/api/rendez-vous/${idRdv}/statut`, { statut: newStatut });
+      fetchRendezvous();
+    } catch (error) {
+      console.error("Erreur changement statut:", error);
+      alert("Erreur lors du changement de statut");
+    }
+  };
+
+  const getStatusBadge = (rdv) => {
     const colors = {
-      "Planifié": "bg-blue-100 text-blue-800",
-      "Effectué": "bg-green-100 text-green-800",
-      "Facturé": "bg-purple-100 text-purple-800 font-bold",
-      "Annulé": "bg-red-100 text-red-800"
+      "Planifié": "bg-blue-100 text-blue-800 hover:bg-blue-200",
+      "Effectué": "bg-green-100 text-green-800 hover:bg-green-200",
+      "Facturé": "bg-purple-100 text-purple-800 hover:bg-purple-200 font-bold",
+      "Annulé": "bg-red-100 text-red-800 hover:bg-red-200"
     };
+    
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${colors[statut] || "bg-gray-100 text-gray-800"}`}>
-        {statut}
-      </span>
+      <select
+        value={rdv.statut}
+        onChange={(e) => handleChangeStatut(rdv.id_rdv, e.target.value)}
+        className={`px-2 py-1 rounded-full text-xs font-semibold cursor-pointer border-0 ${colors[rdv.statut] || "bg-gray-100 text-gray-800"}`}
+        style={{ 
+          appearance: 'none',
+          backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")',
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'right 0.3rem center',
+          backgroundSize: '1em 1em',
+          paddingRight: '1.5rem'
+        }}
+      >
+        <option value="Planifié" style={{ backgroundColor: '#dbeafe', color: '#1e40af' }}>Planifié</option>
+        <option value="Effectué" style={{ backgroundColor: '#dcfce7', color: '#166534' }}>Effectué</option>
+        <option value="Facturé" style={{ backgroundColor: '#f3e8ff', color: '#6b21a8' }}>Facturé</option>
+        <option value="Annulé" style={{ backgroundColor: '#fee2e2', color: '#991b1b' }}>Annulé</option>
+      </select>
     );
   };
 
@@ -832,7 +858,7 @@ const InstallationsPage = () => {
                   </h3>
                   <p className="text-sm text-gray-600">{rdv.type_rdv}</p>
                 </div>
-                {getStatusBadge(rdv.statut)}
+                {getStatusBadge(rdv)}
               </div>
               
               <div className="text-sm space-y-1 mb-3">
@@ -1029,7 +1055,7 @@ const InstallationsPage = () => {
                           {rdv.date_rdv.split('T')[0].split('-').reverse().join('/')} à {rdv.heure_rdv}
                         </p>
                       </div>
-                      {getStatusBadge(rdv.statut)}
+                      {getStatusBadge(rdv)}
                     </div>
                     
                     <div className="text-sm space-y-1">

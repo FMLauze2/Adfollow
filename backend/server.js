@@ -19,6 +19,8 @@ const installationRoutes = require('./routes/installations');
 const contratRoutes = require('./routes/contrats');
 const rendezvousRoutes = require('./routes/rendezvous');
 const todoRoutes = require('./routes/todos');
+const knowledgeRoutes = require('./routes/knowledge');
+const { router: authRoutes } = require('./routes/auth');
 
 // Use routes
 app.use('/api/cabinets', cabinetRoutes);
@@ -27,6 +29,8 @@ app.use('/api/installations', installationRoutes);
 app.use('/api/contrats', contratRoutes);
 app.use('/api/rendez-vous', rendezvousRoutes);
 app.use('/api/todos', todoRoutes);
+app.use('/api/knowledge', knowledgeRoutes);
+app.use('/api/auth', authRoutes);
 
 app.listen(4000, () => {
   console.log('Server running on http://localhost:4000');

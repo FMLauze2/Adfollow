@@ -309,6 +309,37 @@ router.post('/:id/replanifier', async (req, res) => {
   }
 });
 
+// PUT changer manuellement le statut d'un RDV
+router.put('/:id/statut', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { statut } = req.body;
+    
+    // Vérifier que le statut est valide
+    const statutsValides = ['Planifié', 'Effectué', 'Facturé', 'Annulé'];
+    if (!statutsValides.includes(statut)) {
+      return res.status(400).json({ error: 'Statut invalide' });
+    }
+    
+    const result = await pool.query(
+      'UPDATE rendez_vous SET statut = $1 WHERE id_rdv = $2 RETURNING *',
+      [statut, id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'RDV non trouvé' });
+    }
+    
+    res.json({ 
+      message: `Statut modifié en '${statut}'`,
+      rdv: result.rows[0]
+    });
+  } catch (err) {
+    console.error('Erreur changement statut RDV:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // POST créer un contrat à partir d'un RDV
 router.post('/:id/create-contrat', async (req, res) => {
   try {
