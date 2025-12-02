@@ -375,20 +375,71 @@ function KnowledgeBasePage() {
                 />
               </div>
 
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600"
-                >
-                  {editingId ? "Modifier" : "Créer"}
-                </button>
+              <div className="flex gap-2 justify-between">
                 <button
                   type="button"
-                  onClick={resetForm}
-                  className="bg-gray-300 text-gray-700 px-6 py-2 rounded hover:bg-gray-400"
+                  onClick={() => {
+                    setFormData({
+                      titre: "Test - Configuration HFSQL Client/Serveur",
+                      contenu: `# Problème
+Erreur de connexion au serveur HFSQL lors de l'accès aux bases de données.
+
+## Symptômes
+- Message d'erreur : "Impossible de se connecter au serveur"
+- Timeout après 30 secondes
+- Les postes clients ne peuvent pas accéder aux données
+
+## Solution
+
+### Étape 1 : Vérifier le pare-feu
+1. Ouvrir le Pare-feu Windows
+2. Vérifier que le port 4900 (défaut HFSQL) est ouvert
+3. Créer une règle entrante si nécessaire
+
+### Étape 2 : Vérifier le service HFSQL
+1. Ouvrir services.msc
+2. Rechercher "HFSQL Server"
+3. Vérifier qu'il est démarré
+4. Redémarrer si nécessaire
+
+### Étape 3 : Configuration réseau
+- IP du serveur : 192.168.1.100
+- Port : 4900
+- Base de données : MEDOC_DATA
+
+## Commandes utiles
+\`\`\`
+netstat -an | findstr 4900
+telnet 192.168.1.100 4900
+\`\`\`
+
+## Temps d'intervention estimé
+15-30 minutes`,
+                      categorie: "Réseau",
+                      tags: "HFSQL, réseau, connexion, dépannage",
+                      auteur: "Support Technique"
+                    });
+                  }}
+                  className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm"
                 >
-                  Annuler
+                  🧪 Remplir avec test
                 </button>
+                
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600"
+                  >
+                    {editingId ? "Modifier" : "Créer"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="bg-gray-300 text-gray-700 px-6 py-2 rounded hover:bg-gray-400"
+                  >
+                    Annuler
+                  </button>
+                </div>
               </div>
             </div>
           </form>
