@@ -1,6 +1,53 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
+// Composant pour afficher le contenu avec images
+function ArticleContent({ content }) {
+  const [renderedContent, setRenderedContent] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const renderContent = async () => {
+      setLoading(true);
+      let rendered = content;
+
+      // Trouver toutes les références d'images kb-image:ID
+      const imageRegex = /!\[([^\]]*)\]\(kb-image:(\d+)\)/g;
+      const matches = [...content.matchAll(imageRegex)];
+
+      // Charger chaque image et remplacer par base64
+      for (const match of matches) {
+        const [fullMatch, altText, imageId] = match;
+        try {
+          const response = await axios.get(`http://localhost:4000/api/knowledge/images/${imageId}`);
+          const imageData = response.data;
+          const base64Img = `data:${imageData.mime_type};base64,${imageData.base64_data}`;
+          rendered = rendered.replace(fullMatch, `<img src="${base64Img}" alt="${altText}" style="max-width: 100%; height: auto; border-radius: 8px; margin: 16px 0;" />`);
+        } catch (error) {
+          console.error(`Erreur chargement image ${imageId}:`, error);
+          rendered = rendered.replace(fullMatch, `<p style="color: red;">[Image ${imageId} non trouvée]</p>`);
+        }
+      }
+
+      setRenderedContent(rendered);
+      setLoading(false);
+    };
+
+    renderContent();
+  }, [content]);
+
+  if (loading) {
+    return <p className="text-gray-500">Chargement du contenu...</p>;
+  }
+
+  return (
+    <pre 
+      className="whitespace-pre-wrap font-sans text-gray-700 leading-relaxed"
+      dangerouslySetInnerHTML={{ __html: renderedContent }}
+    />
+  );
+}
+
 function KnowledgeBasePage() {
   const [articles, setArticles] = useState([]);
   const [filteredArticles, setFilteredArticles] = useState([]);
@@ -178,6 +225,59 @@ function KnowledgeBasePage() {
     } catch (error) {
       console.error("Erreur marquage utile:", error);
     }
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Vérifier la taille (2MB max)
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Image trop volumineuse (max 2MB)");
+      return;
+    }
+
+    // Vérifier le type
+    if (!file.type.startsWith('image/')) {
+      alert("Fichier non valide. Utilisez PNG, JPG ou GIF");
+      return;
+    }
+
+    try {
+      // Convertir en base64
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Data = reader.result.split(',')[1]; // Enlever le préfixe data:image/...;base64,
+        
+        // Upload vers le backend
+        const response = await axios.post("http://localhost:4000/api/knowledge/upload-image", {
+          filename: file.name,
+          base64Data: base64Data,
+          mimeType: file.type
+        });
+
+        const imageId = response.data.id_image;
+        
+        // Créer le tag image avec l'ID
+        const imageTag = `\n![${file.name}](kb-image:${imageId})\n`;
+        
+        // Ajouter à la fin du contenu (pas à la position du curseur)
+        setFormData({
+          ...formData,
+          contenu: formData.contenu + imageTag
+        });
+
+        alert("Image ajoutée ! Elle sera sauvegardée avec l'article.");
+      };
+
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Erreur upload image:", error);
+      alert("Erreur lors de l'upload de l'image");
+    }
+
+    // Reset input
+    e.target.value = '';
   };
 
   const handleSubmit = async (e) => {
@@ -365,6 +465,22 @@ function KnowledgeBasePage() {
 
               <div>
                 <label className="block text-sm font-medium mb-1">Contenu * (Markdown supporté)</label>
+                <div className="mb-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="image-upload"
+                  />
+                  <label
+                    htmlFor="image-upload"
+                    className="inline-block bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600 cursor-pointer"
+                  >
+                    📷 Ajouter une image
+                  </label>
+                  <span className="ml-2 text-xs text-gray-500">Max 2MB • PNG, JPG, GIF • Ajoutée en bas</span>
+                </div>
                 <textarea
                   value={formData.contenu}
                   onChange={(e) => setFormData({ ...formData, contenu: e.target.value })}
@@ -694,9 +810,7 @@ telnet 192.168.1.100 4900
             )}
 
             <div className="prose max-w-none mb-6">
-              <pre className="whitespace-pre-wrap font-sans text-gray-700 leading-relaxed">
-                {selectedArticle.contenu}
-              </pre>
+              <ArticleContent content={selectedArticle.contenu} />
             </div>
 
             <div className="flex gap-3 justify-end border-t pt-4">
