@@ -392,39 +392,89 @@ const InstallationsPage = () => {
   };
 
   // Définition des champs spécifiques par type de RDV
-  const getFieldsForType = (type) => {
+  // Champs essentiels à saisir lors de la prise de RDV (Section 1)
+  const getEssentialFieldsForType = (type) => {
     switch (type) {
       case "Installation serveur":
         return [
-          { name: "nom_poste_serveur", label: "Nom poste serveur", type: "text" },
-          { name: "type_poste_serveur", label: "Type poste serveur", type: "text" },
-          { name: "nb_postes_secondaires", label: "Nombre de postes secondaires", type: "number" },
-          { name: "nb_lecteurs_carte", label: "Nombres de lecteurs de carte", type: "number" },
+          { name: "nb_postes_secondaires", label: "Nombre de postes secondaires prévus", type: "number" }
+        ];
+      case "Installation poste secondaire":
+        return [];
+      case "Changement de poste serveur":
+        return [];
+      case "Formation":
+        return [
+          { name: "module_formation", label: "Module de formation", type: "text" },
+          { name: "nb_participants", label: "Nombre de participants", type: "number" }
+        ];
+      case "Export BDD":
+        return [
+          { name: "format_export", label: "Format d'export souhaité", type: "text" }
+        ];
+      case "Mise à jour":
+        return [
+          { name: "version_cible", label: "Version ciblée", type: "text" }
+        ];
+      case "Démo":
+        return [
+          { name: "logiciel_metier", label: "Logiciel métier actuel du cabinet", type: "text" }
+        ];
+      case "Autre":
+        return [
+          { name: "type_intervention", label: "Type d'intervention", type: "text" }
+        ];
+      default:
+        return [];
+    }
+  };
+
+  // Champs détaillés à compléter lors de l'intervention (Section 2)
+  const getDetailedFieldsForType = (type) => {
+    switch (type) {
+      case "Installation serveur":
+        return [
+          { name: "nom_poste_serveur", label: "Nom du poste serveur", type: "text" },
+          { name: "type_poste_serveur", label: "Type de poste serveur", type: "text" },
+          { name: "nb_lecteurs_carte", label: "Nombre de lecteurs de carte", type: "number" },
           { name: "type_lecteurs_carte", label: "Type de lecteurs de carte", type: "text" },
           { name: "fournisseur_lecteur", label: "Fournisseur lecteur de carte", type: "text" }
         ];
       case "Installation poste secondaire":
         return [
-          { name: "nom_poste_serveur", label: "Nom poste serveur", type: "text" }
+          { name: "nom_poste_serveur", label: "Nom du poste serveur", type: "text" },
+          { name: "nom_poste_secondaire", label: "Nom du poste secondaire", type: "text" },
+          { name: "type_poste", label: "Type de poste", type: "text" }
         ];
       case "Changement de poste serveur":
         return [
-          { name: "nom_ancien_serveur", label: "Nom ancien serveur", type: "text" },
-          { name: "nom_nouveau_serveur", label: "Nom nouveau serveur", type: "text" },
+          { name: "nom_ancien_serveur", label: "Nom de l'ancien serveur", type: "text" },
+          { name: "nom_nouveau_serveur", label: "Nom du nouveau serveur", type: "text" },
+          { name: "type_nouveau_serveur", label: "Type du nouveau serveur", type: "text" },
           { name: "version_ancien_serveur", label: "Version de l'ancien serveur", type: "text" }
+        ];
+      case "Formation":
+        return [
+          { name: "duree_prevue", label: "Durée prévue (heures)", type: "number" },
+          { name: "duree_reelle", label: "Durée réelle (heures)", type: "number" }
         ];
       case "Export BDD":
         return [
-          { name: "format_export", label: "Format des données d'export", type: "text" }
+          { name: "type_donnees", label: "Type de données exportées", type: "text" },
+          { name: "taille_export", label: "Taille de l'export (Mo)", type: "number" }
         ];
       case "Mise à jour":
         return [
-          { name: "version_cible", label: "Version ciblée par la mise à jour", type: "text" },
-          { name: "version_base", label: "Version installée de base", type: "text" }
+          { name: "version_base", label: "Version installée de base", type: "text" },
+          { name: "nb_postes", label: "Nombre de postes mis à jour", type: "number" }
         ];
       case "Démo":
         return [
-          { name: "logiciel_metier", label: "Logiciel métier utilisé (optionnel)", type: "text", required: false }
+          { name: "fonctionnalites", label: "Fonctionnalités démontrées", type: "text" }
+        ];
+      case "Autre":
+        return [
+          { name: "description", label: "Description de l'intervention", type: "text" }
         ];
       default:
         return [];
@@ -436,8 +486,8 @@ const InstallationsPage = () => {
     const typesWithoutPraticiens = [
       "Installation poste secondaire",
       "Changement de poste serveur",
-      "Démo",
-      "Mise à jour"
+      "Mise à jour",
+      "Export BDD"
     ];
     return !typesWithoutPraticiens.includes(type);
   };
@@ -613,140 +663,166 @@ const InstallationsPage = () => {
             {editingRdv ? "Modifier le rendez-vous" : "Nouveau rendez-vous"}
           </h3>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Cabinet *</label>
-                <input
-                  type="text"
-                  required
-                  value={form.cabinet}
-                  onChange={(e) => setForm({ ...form, cabinet: e.target.value })}
-                  className="w-full border px-3 py-2 rounded"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Type *</label>
-                <select
-                  required
-                  value={form.type_rdv}
-                  onChange={(e) => handleTypeChange(e.target.value)}
-                  className="w-full border px-3 py-2 rounded"
-                >
-                  <option value="Installation serveur">Installation serveur</option>
-                  <option value="Installation poste secondaire">Installation poste secondaire</option>
-                  <option value="Changement de poste serveur">Changement de poste serveur</option>
-                  <option value="Formation">Formation</option>
-                  <option value="Export BDD">Export BDD</option>
-                  <option value="Démo">Démo</option>
-                  <option value="Mise à jour">Mise à jour</option>
-                  <option value="Autre">Autre</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Date *</label>
-                <input
-                  type="date"
-                  required
-                  value={form.date_rdv}
-                  onChange={(e) => setForm({ ...form, date_rdv: e.target.value })}
-                  className="w-full border px-3 py-2 rounded"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Heure *</label>
-                <input
-                  type="time"
-                  required
-                  value={form.heure_rdv}
-                  onChange={(e) => setForm({ ...form, heure_rdv: e.target.value })}
-                  className="w-full border px-3 py-2 rounded"
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1">Adresse *</label>
-                <input
-                  type="text"
-                  required
-                  value={form.adresse}
-                  onChange={(e) => setForm({ ...form, adresse: e.target.value })}
-                  className="w-full border px-3 py-2 rounded"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Code Postal *</label>
-                <input
-                  type="text"
-                  required
-                  value={form.code_postal}
-                  onChange={async (e) => {
-                    const cp = e.target.value;
-                    setForm({ ...form, code_postal: cp });
-                    
-                    // Auto-complétion ville si CP valide (5 chiffres)
-                    if (cp.length === 5 && /^\d{5}$/.test(cp)) {
-                      try {
-                        const response = await fetch(`https://geo.api.gouv.fr/communes?codePostal=${cp}&fields=nom&format=json`);
-                        const data = await response.json();
-                        if (data && data.length > 0) {
-                          setForm(prev => ({ ...prev, ville: data[0].nom }));
-                        }
-                      } catch (error) {
-                        console.error("Erreur API Geo:", error);
-                      }
-                    }
-                  }}
-                  className="w-full border px-3 py-2 rounded"
-                  placeholder="75001"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Ville *</label>
-                <input
-                  type="text"
-                  required
-                  value={form.ville}
-                  onChange={(e) => setForm({ ...form, ville: e.target.value })}
-                  className="w-full border px-3 py-2 rounded"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Téléphone</label>
-                <input
-                  type="tel"
-                  value={form.telephone}
-                  onChange={(e) => setForm({ ...form, telephone: e.target.value })}
-                  className="w-full border px-3 py-2 rounded"
-                  placeholder="06 12 34 56 78"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Email</label>
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full border px-3 py-2 rounded"
-                  placeholder="contact@cabinet.fr"
-                />
+            {/* SECTION 1 : PRISE DE RDV (Obligatoire) */}
+            <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mb-4">
+              <h4 className="text-md font-semibold mb-3 text-blue-700">📅 Prise de rendez-vous</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Nom du cabinet *</label>
+                  <input
+                    type="text"
+                    required
+                    value={form.cabinet}
+                    onChange={(e) => setForm({ ...form, cabinet: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                    placeholder="Cabinet médical..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Type *</label>
+                  <select
+                    required
+                    value={form.type_rdv}
+                    onChange={(e) => handleTypeChange(e.target.value)}
+                    className="w-full border px-3 py-2 rounded"
+                  >
+                    <option value="Installation serveur">Installation serveur</option>
+                    <option value="Installation poste secondaire">Installation poste secondaire</option>
+                    <option value="Changement de poste serveur">Changement de poste serveur</option>
+                    <option value="Formation">Formation</option>
+                    <option value="Export BDD">Export BDD</option>
+                    <option value="Démo">Démo</option>
+                    <option value="Mise à jour">Mise à jour</option>
+                    <option value="Autre">Autre</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={form.date_rdv}
+                    onChange={(e) => setForm({ ...form, date_rdv: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Heure *</label>
+                  <input
+                    type="time"
+                    required
+                    value={form.heure_rdv}
+                    onChange={(e) => setForm({ ...form, heure_rdv: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Téléphone</label>
+                  <input
+                    type="tel"
+                    value={form.telephone}
+                    onChange={(e) => setForm({ ...form, telephone: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                    placeholder="06 12 34 56 78"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                    placeholder="contact@cabinet.fr"
+                  />
+                </div>
+
+                {/* Champs essentiels spécifiques au type de RDV */}
+                {getEssentialFieldsForType(form.type_rdv).map(field => (
+                  <div key={field.name}>
+                    <label className="block text-sm font-medium mb-1">
+                      {field.label}
+                    </label>
+                    <input
+                      type={field.type}
+                      value={specificFields[field.name] || ""}
+                      onChange={(e) => setSpecificFields({ ...specificFields, [field.name]: e.target.value })}
+                      className="w-full border px-3 py-2 rounded"
+                      placeholder={field.label}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Champs spécifiques selon le type de RDV */}
-            {getFieldsForType(form.type_rdv).length > 0 && (
-              <div className="border-t pt-4">
-                <h4 className="text-md font-semibold mb-3 text-blue-600">Informations spécifiques - {form.type_rdv}</h4>
+            {/* SECTION 2 : DÉTAILS INTERVENTION (Optionnel - à compléter plus tard) */}
+            <div className="bg-gray-50 border-2 border-gray-300 rounded-lg p-4 mb-4">
+              <h4 className="text-md font-semibold mb-3 text-gray-700">🏥 Détails de l'intervention <span className="text-xs font-normal text-gray-500">(peut être complété plus tard)</span></h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium mb-1">Adresse</label>
+                  <input
+                    type="text"
+                    value={form.adresse}
+                    onChange={(e) => setForm({ ...form, adresse: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                    placeholder="12 rue de la Santé"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Code Postal</label>
+                  <input
+                    type="text"
+                    value={form.code_postal}
+                    onChange={async (e) => {
+                      const cp = e.target.value;
+                      setForm({ ...form, code_postal: cp });
+                      
+                      // Auto-complétion ville si CP valide (5 chiffres)
+                      if (cp.length === 5 && /^\d{5}$/.test(cp)) {
+                        try {
+                          const response = await fetch(`https://geo.api.gouv.fr/communes?codePostal=${cp}&fields=nom&format=json`);
+                          const data = await response.json();
+                          if (data && data.length > 0) {
+                            setForm(prev => ({ ...prev, ville: data[0].nom }));
+                          }
+                        } catch (error) {
+                          console.error("Erreur API Geo:", error);
+                        }
+                      }
+                    }}
+                    className="w-full border px-3 py-2 rounded"
+                    placeholder="75001"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Ville</label>
+                  <input
+                    type="text"
+                    value={form.ville}
+                    onChange={(e) => setForm({ ...form, ville: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                    placeholder="Paris"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Champs détaillés selon le type de RDV - Dans section Détails */}
+            {getDetailedFieldsForType(form.type_rdv).length > 0 && (
+              <div className="bg-gray-50 border-2 border-gray-300 rounded-lg p-4 mb-4">
+                <h4 className="text-md font-semibold mb-3 text-gray-700">⚙️ Informations détaillées - {form.type_rdv}</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  {getFieldsForType(form.type_rdv).map(field => (
+                  {getDetailedFieldsForType(form.type_rdv).map(field => (
                     <div key={field.name}>
                       <label className="block text-sm font-medium mb-1">
-                        {field.label} {field.required !== false && "*"}
+                        {field.label}
                       </label>
                       <input
                         type={field.type}
                         value={specificFields[field.name] || ""}
                         onChange={(e) => setSpecificFields({ ...specificFields, [field.name]: e.target.value })}
                         className="w-full border px-3 py-2 rounded"
-                        required={field.required !== false}
                       />
                     </div>
                   ))}
@@ -754,10 +830,10 @@ const InstallationsPage = () => {
               </div>
             )}
 
-            {/* Praticiens - Conditionnel selon le type */}
+            {/* Praticiens - Conditionnel selon le type - Dans section Détails */}
             {shouldShowPraticiens(form.type_rdv) && (
-              <div>
-                <label className="block text-sm font-medium mb-2">Praticiens</label>
+              <div className="bg-gray-50 border-2 border-gray-300 rounded-lg p-4 mb-4">
+                <label className="block text-sm font-medium mb-2 text-gray-700">👨‍⚕️ Praticiens</label>
                 <div className="flex gap-2 mb-2">
                   <input
                     type="text"

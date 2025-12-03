@@ -45,7 +45,9 @@ router.post('/', async (req, res) => {
       code_postal,
       ville,
       praticiens,
-      notes
+      notes,
+      telephone,
+      email
     } = req.body;
 
     // Compenser le décalage timezone en ajoutant 1 jour
@@ -55,10 +57,10 @@ router.post('/', async (req, res) => {
     
     const result = await pool.query(
       `INSERT INTO rendez_vous 
-       (cabinet, date_rdv, heure_rdv, type_rdv, adresse, code_postal, ville, praticiens, notes, statut, date_creation) 
-       VALUES ($1, $2::date, $3, $4, $5, $6, $7, $8, $9, 'Planifié', NOW()) 
+       (cabinet, date_rdv, heure_rdv, type_rdv, adresse, code_postal, ville, praticiens, notes, telephone, email, statut, date_creation) 
+       VALUES ($1, $2::date, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'Planifié', NOW()) 
        RETURNING *`,
-      [cabinet, correctedDate, heure_rdv, type_rdv, adresse, code_postal, ville, JSON.stringify(praticiens || []), notes]
+      [cabinet, correctedDate, heure_rdv, type_rdv, adresse || null, code_postal || null, ville || null, JSON.stringify(praticiens || []), notes, telephone || null, email || null]
     );
 
     res.status(201).json(result.rows[0]);

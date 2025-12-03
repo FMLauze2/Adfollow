@@ -513,6 +513,65 @@ const HomePage = () => {
         </div>
       </div>
 
+      {/* RDV du jour */}
+      {!loading && (() => {
+        const today = new Date().toISOString().split('T')[0];
+        const todayRdvList = rendezvous.filter(rdv => {
+          if (!rdv.date_rdv || rdv.statut === 'Annulé') return false;
+          return rdv.date_rdv.split('T')[0] === today;
+        });
+        
+        return todayRdvList.length > 0 && (
+          <div className="max-w-6xl mx-auto mt-12">
+            <h2 className="text-2xl font-bold mb-6 text-left dark:text-white">🔔 Rendez-vous du jour</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {todayRdvList.map(rdv => (
+                <div 
+                  key={rdv.id_rdv} 
+                  className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 border-2 border-blue-500 dark:border-blue-400"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1">
+                      <h3 className="font-bold text-gray-900 dark:text-white text-lg">{rdv.cabinet}</h3>
+                      <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">{rdv.type_rdv}</p>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded font-semibold ${
+                      rdv.statut === 'Planifié' ? 'bg-blue-500 text-white' : 
+                      rdv.statut === 'Effectué' ? 'bg-green-500 text-white' : 
+                      'bg-purple-500 text-white'
+                    }`}>
+                      {rdv.statut}
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-2 text-sm text-gray-800 dark:text-gray-200">
+                    <p className="flex items-center gap-2 font-bold text-blue-600 dark:text-blue-400">
+                      ⏰ Aujourd'hui à {rdv.heure_rdv}
+                    </p>
+                    {rdv.ville && <p className="text-sm">📍 {rdv.ville}</p>}
+                    {rdv.adresse && <p className="text-xs text-gray-600 dark:text-gray-400">{rdv.adresse}</p>}
+                    {rdv.telephone && <p className="text-xs">📞 {rdv.telephone}</p>}
+                    {rdv.email && <p className="text-xs">✉️ {rdv.email}</p>}
+                    {rdv.praticiens && rdv.praticiens.length > 0 && (
+                      <p className="text-sm">
+                        👥 {rdv.praticiens.map(p => `${p.prenom} ${p.nom}`).join(', ')}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <a
+                    href="/installations"
+                    className="mt-3 block text-center text-sm bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 rounded"
+                  >
+                    Voir détails →
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Calendrier des RDV à venir */}
       {!loading && upcomingRdv.length > 0 && (
         <div className="max-w-6xl mx-auto mt-12">
