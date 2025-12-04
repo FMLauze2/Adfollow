@@ -4,6 +4,7 @@ import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 // Import de la navbar et des pages
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { useTheme } from "./contexts/ThemeContext";
 import Navbar from "./components/Navbar";
 import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
@@ -37,6 +38,32 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+// Composant Footer
+function Footer() {
+  const { darkMode, toggleTheme } = useTheme();
+  
+  return (
+    <footer className="bg-gray-800 dark:bg-gray-900 text-white py-4 mt-8">
+      <div className="container mx-auto px-4 flex justify-center items-center gap-6">
+        <a href="/historique" className="hover:text-blue-400 transition-colors">
+          📜 Historique
+        </a>
+        <a href="/mes-stats" className="hover:text-blue-400 transition-colors">
+          📊 Mes Stats
+        </a>
+        <button
+          onClick={toggleTheme}
+          className="bg-white bg-opacity-20 hover:bg-opacity-30 px-3 py-1 rounded-lg transition-all text-xl"
+          title={darkMode ? "Mode clair" : "Mode sombre"}
+        >
+          {darkMode ? "☀️" : "🌙"}
+        </button>
+        <span className="text-gray-400">© 2025 AdFollow</span>
+      </div>
+    </footer>
+  );
+}
+
 function AppContent() {
   const { isAuthenticated } = useAuth();
 
@@ -55,7 +82,7 @@ function AppContent() {
   return (
     <>
       {isAuthenticated() && <Navbar />}
-      <div style={{ padding: isAuthenticated() ? "20px" : "0" }}>
+      <div style={{ padding: isAuthenticated() ? "20px" : "0", minHeight: "calc(100vh - 140px)" }}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
@@ -70,6 +97,7 @@ function AppContent() {
           <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
         </Routes>
       </div>
+      {isAuthenticated() && <Footer />}
     </>
   );
 }
