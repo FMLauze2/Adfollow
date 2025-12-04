@@ -99,15 +99,16 @@ const InstallationsPage = () => {
     try {
       // Construire les notes avec champs spécifiques en JSON
       const notesData = {
-        specificFields,
-        generalNotes: form.notes
+        specificFields: specificFields || {},
+        generalNotes: form.notes || ""
       };
       
       // Préparer les données avec date au format ISO sans timezone
       const submitData = {
         ...form,
         date_rdv: form.date_rdv, // Garder le format YYYY-MM-DD simple
-        notes: JSON.stringify(notesData)
+        notes: JSON.stringify(notesData),
+        praticiens: form.praticiens || []
       };
       
       if (editingRdv) {
@@ -818,7 +819,7 @@ const InstallationsPage = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Téléphone</label>
+                  <label className="block text-sm font-medium mb-1">Téléphone <span className="text-gray-500 font-normal">(optionnel)</span></label>
                   <input
                     type="tel"
                     value={form.telephone}
@@ -828,7 +829,7 @@ const InstallationsPage = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Email</label>
+                  <label className="block text-sm font-medium mb-1">Email <span className="text-gray-500 font-normal">(optionnel)</span></label>
                   <input
                     type="email"
                     value={form.email}
@@ -838,7 +839,7 @@ const InstallationsPage = () => {
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-1">Adresse</label>
+                  <label className="block text-sm font-medium mb-1">Adresse <span className="text-gray-500 font-normal">(optionnel)</span></label>
                   <input
                     type="text"
                     value={form.adresse}
@@ -848,7 +849,7 @@ const InstallationsPage = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Code Postal</label>
+                  <label className="block text-sm font-medium mb-1">Code Postal <span className="text-gray-500 font-normal">(optionnel)</span></label>
                   <input
                     type="text"
                     value={form.code_postal}
@@ -874,7 +875,7 @@ const InstallationsPage = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Ville</label>
+                  <label className="block text-sm font-medium mb-1">Ville <span className="text-gray-500 font-normal">(optionnel)</span></label>
                   <input
                     type="text"
                     value={form.ville}

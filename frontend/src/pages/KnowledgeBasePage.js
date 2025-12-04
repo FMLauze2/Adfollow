@@ -74,6 +74,9 @@ function KnowledgeBasePage() {
     "Infrastructure": true,
     "Autre": true
   });
+  const [customCategories, setCustomCategories] = useState([]);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
 
   // Structure hiérarchique des catégories
   const categoryGroups = {
@@ -159,6 +162,7 @@ function KnowledgeBasePage() {
   useEffect(() => {
     fetchArticles();
     fetchCategories();
+    loadCustomCategories();
   }, []);
 
   useEffect(() => {
@@ -184,6 +188,40 @@ function KnowledgeBasePage() {
     } catch (error) {
       console.error("Erreur chargement catégories:", error);
     }
+  };
+
+  const loadCustomCategories = () => {
+    const saved = localStorage.getItem('knowledge_custom_categories');
+    if (saved) {
+      setCustomCategories(JSON.parse(saved));
+    }
+  };
+
+  const saveCustomCategory = () => {
+    if (!newCategoryName.trim()) {
+      alert('Veuillez entrer un nom de catégorie');
+      return;
+    }
+    
+    const allCategories = [...categoriesPredef, ...customCategories];
+    if (allCategories.includes(newCategoryName.trim())) {
+      alert('Cette catégorie existe déjà');
+      return;
+    }
+
+    const updated = [...customCategories, newCategoryName.trim()];
+    setCustomCategories(updated);
+    localStorage.setItem('knowledge_custom_categories', JSON.stringify(updated));
+    setNewCategoryName('');
+    setShowCategoryModal(false);
+  };
+
+  const deleteCustomCategory = (categoryName) => {
+    if (!window.confirm(`Supprimer la catégorie "${categoryName}" ?`)) return;
+    
+    const updated = customCategories.filter(cat => cat !== categoryName);
+    setCustomCategories(updated);
+    localStorage.setItem('knowledge_custom_categories', JSON.stringify(updated));
   };
 
   const filterArticles = () => {
@@ -451,16 +489,35 @@ function KnowledgeBasePage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Catégorie *</label>
+                  <label className="block text-sm font-medium mb-1 flex items-center justify-between">
+                    <span>Catégorie *</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowCategoryModal(true)}
+                      className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
+                      title="Ajouter une catégorie personnalisée"
+                    >
+                      ➕ Nouvelle catégorie
+                    </button>
+                  </label>
                   <select
                     value={formData.categorie}
                     onChange={(e) => setFormData({ ...formData, categorie: e.target.value })}
                     required
                     className="w-full border px-3 py-2 rounded"
                   >
-                    {categoriesPredef.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
+                    <optgroup label="Catégories prédéfinies">
+                      {categoriesPredef.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </optgroup>
+                    {customCategories.length > 0 && (
+                      <optgroup label="Catégories personnalisées">
+                        {customCategories.map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </div>
 
@@ -849,6 +906,72 @@ telnet 192.168.1.100 4900
                 className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300"
               >
                 Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal ajout catégorie */}
+      {showCategoryModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowCategoryModal(false)}
+        >
+          <div
+            className="bg-white rounded-lg p-6 max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold mb-4">➕ Nouvelle catégorie</h2>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Nom de la catégorie</label>
+              <input
+                type="text"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && saveCustomCategory()}
+                placeholder="Ex: Formation, Client VIP, etc."
+                className="w-full border px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+                autoFocus
+              />
+            </div>
+
+            {customCategories.length > 0 && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">Catégories personnalisées existantes</label>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {customCategories.map(cat => (
+                    <div key={cat} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded">
+                      <span className="text-sm">{cat}</span>
+                      <button
+                        onClick={() => deleteCustomCategory(cat)}
+                        className="text-red-500 hover:text-red-700 text-sm"
+                        title="Supprimer cette catégorie"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setShowCategoryModal(false);
+                  setNewCategoryName('');
+                }}
+                className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={saveCustomCategory}
+                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+              >
+                ✅ Ajouter
               </button>
             </div>
           </div>
