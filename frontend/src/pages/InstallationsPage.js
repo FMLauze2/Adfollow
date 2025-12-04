@@ -56,6 +56,23 @@ const InstallationsPage = () => {
     fetchRendezvous();
   }, []);
 
+  // Gérer l'ouverture du modal depuis le calendrier
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const traiterRdvId = urlParams.get('traiter');
+    
+    if (traiterRdvId && rendezvous.length > 0) {
+      const rdv = rendezvous.find(r => r.id_rdv === parseInt(traiterRdvId));
+      if (rdv) {
+        setTreatmentModalRdv(rdv);
+        // Nettoyer l'URL
+        window.history.replaceState({}, '', '/installations');
+        // Scroll vers le haut
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  }, [rendezvous]);
+
   // Initialiser le formulaire de traitement quand le modal s'ouvre
   useEffect(() => {
     if (treatmentModalRdv) {
@@ -1147,7 +1164,7 @@ const InstallationsPage = () => {
               />
             </div>
 
-            {!completeModalRdv.id_contrat && (
+            {!completeModalRdv.id_contrat && completeModalRdv.type_rdv === 'Installation serveur' && (
               <div className="border-t pt-4 mb-4">
                 <label className="flex items-center space-x-2 mb-3">
                   <input

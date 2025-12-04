@@ -475,7 +475,16 @@ function CalendrierPage() {
               )}
             </div>
 
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowModal(false);
+                  window.location.href = `/installations?traiter=${selectedRdv.id_rdv}`;
+                }}
+                className="px-4 py-2 bg-purple-500 text-white hover:bg-purple-600 rounded-lg transition"
+              >
+                🔧 Traiter ce RDV
+              </button>
               <button
                 onClick={() => setShowModal(false)}
                 className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition"

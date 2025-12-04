@@ -2,6 +2,7 @@ import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTheme } from "../contexts/ThemeContext";
 import { useAuth } from "../contexts/AuthContext";
+import NotificationBell from "./NotificationBell";
 
 const Navbar = () => {
   const { darkMode, toggleTheme } = useTheme();
@@ -31,6 +32,9 @@ const Navbar = () => {
           <Link style={styles.link} to="/admin">⚙️ Administration</Link>
         )}
         
+        {/* Notifications */}
+        <NotificationBell />
+
         {/* Info utilisateur */}
         {user && (
           <span style={{ ...styles.link, cursor: 'default', opacity: 0.8 }}>

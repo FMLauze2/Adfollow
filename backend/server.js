@@ -22,7 +22,11 @@ const contratRoutes = require('./routes/contrats');
 const rendezvousRoutes = require('./routes/rendezvous');
 const todoRoutes = require('./routes/todos');
 const knowledgeRoutes = require('./routes/knowledge');
+const notificationRoutes = require('./routes/notifications');
 const { router: authRoutes } = require('./routes/auth');
+
+// Import services
+const notificationService = require('./services/NotificationService');
 
 // Use routes
 app.use('/api/cabinets', cabinetRoutes);
@@ -32,8 +36,12 @@ app.use('/api/contrats', contratRoutes);
 app.use('/api/rendez-vous', rendezvousRoutes);
 app.use('/api/todos', todoRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/auth', authRoutes);
 
 app.listen(4000, () => {
   console.log('Server running on http://localhost:4000');
+  
+  // Démarrer le service de notifications
+  notificationService.start();
 });
