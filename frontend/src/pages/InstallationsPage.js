@@ -34,6 +34,13 @@ const InstallationsPage = () => {
   // Modal états
   const [editingRdv, setEditingRdv] = useState(null);
   const [completeModalRdv, setCompleteModalRdv] = useState(null);
+  const [treatmentModalRdv, setTreatmentModalRdv] = useState(null);
+  const [treatmentForm, setTreatmentForm] = useState({
+    specificFields: {},
+    praticiens: [],
+    notes: '',
+    checklist: []
+  });
   const [grcText, setGrcText] = useState("");
   const [copiedGrc, setCopiedGrc] = useState(false);
   const [copiedRdvId, setCopiedRdvId] = useState(null);
@@ -48,6 +55,29 @@ const InstallationsPage = () => {
   useEffect(() => {
     fetchRendezvous();
   }, []);
+
+  // Initialiser le formulaire de traitement quand le modal s'ouvre
+  useEffect(() => {
+    if (treatmentModalRdv) {
+      let parsedSpecificFields = {};
+      let parsedNotes = '';
+      
+      try {
+        const notesData = JSON.parse(treatmentModalRdv.notes || '{}');
+        parsedSpecificFields = notesData.specificFields || {};
+        parsedNotes = notesData.generalNotes || '';
+      } catch {
+        parsedNotes = treatmentModalRdv.notes || '';
+      }
+      
+      setTreatmentForm({
+        specificFields: parsedSpecificFields,
+        praticiens: treatmentModalRdv.praticiens || [],
+        notes: parsedNotes,
+        checklist: []
+      });
+    }
+  }, [treatmentModalRdv]);
 
   const fetchRendezvous = async () => {
     setLoading(true);
@@ -167,6 +197,11 @@ const InstallationsPage = () => {
     });
     setSpecificFields(parsedSpecificFields);
     setShowForm(true);
+    
+    // Remonter automatiquement en haut pour voir le formulaire
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100);
   };
 
   const handleDuplicate = (rdv) => {
@@ -215,6 +250,23 @@ const InstallationsPage = () => {
   };
 
   const handleComplete = async (rdv) => {
+    // Validation praticiens pour les installations
+    const typeNeedsPraticiens = ["Installation serveur", "Formation", "Démo", "Autre"];
+    if (typeNeedsPraticiens.includes(rdv.type_rdv)) {
+      if (!rdv.praticiens || rdv.praticiens.length === 0) {
+        alert("❌ Vous devez renseigner au moins un praticien avant de marquer ce RDV comme effectué.\n\nVeuillez modifier le RDV et ajouter les praticiens.");
+        return;
+      }
+    }
+    
+    // Validation email obligatoire pour Installation serveur
+    if (rdv.type_rdv === "Installation serveur") {
+      if (!rdv.email || rdv.email.trim() === "") {
+        alert("❌ Vous devez renseigner l'email du cabinet avant de marquer cette installation comme effectuée.\n\nL'email est nécessaire pour l'envoi du contrat de service.\n\nVeuillez modifier le RDV et ajouter l'email.");
+        return;
+      }
+    }
+    
     try {
       const response = await axios.post(`http://localhost:4000/api/rendez-vous/${rdv.id_rdv}/complete`);
       setGrcText(response.data.grcText);
@@ -230,6 +282,26 @@ const InstallationsPage = () => {
   };
 
   const handleFacturer = async (id) => {
+    // Trouver le RDV pour validation
+    const rdv = rendezvous.find(r => r.id_rdv === id);
+    if (rdv) {
+      const typeNeedsPraticiens = ["Installation serveur", "Formation", "Démo", "Autre"];
+      if (typeNeedsPraticiens.includes(rdv.type_rdv)) {
+        if (!rdv.praticiens || rdv.praticiens.length === 0) {
+          alert("❌ Vous devez renseigner au moins un praticien avant de facturer ce RDV.\n\nVeuillez modifier le RDV et ajouter les praticiens.");
+          return;
+        }
+      }
+      
+      // Validation email obligatoire pour Installation serveur
+      if (rdv.type_rdv === "Installation serveur") {
+        if (!rdv.email || rdv.email.trim() === "") {
+          alert("❌ Vous devez renseigner l'email du cabinet avant de facturer cette installation.\n\nL'email est nécessaire pour l'envoi du contrat de service.\n\nVeuillez modifier le RDV et ajouter l'email.");
+          return;
+        }
+      }
+    }
+    
     if (!window.confirm("Marquer ce rendez-vous comme facturé ?")) return;
     
     try {
@@ -280,6 +352,21 @@ const InstallationsPage = () => {
     }
   };
 
+  const handleRegenerateContrat = async (rdv) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir régénérer le contrat ?\n\nCela va recréer le PDF avec les informations actuelles du RDV.")) return;
+    
+    try {
+      const response = await axios.post(
+        `http://localhost:4000/api/rendez-vous/${rdv.id_rdv}/regenerate-contrat`
+      );
+      alert("✓ Contrat régénéré avec succès !");
+      fetchRendezvous();
+    } catch (error) {
+      console.error("Erreur régénération contrat:", error);
+      alert(error.response?.data?.error || "Erreur lors de la régénération du contrat");
+    }
+  };
+
   const downloadICS = async (rdv) => {
     try {
       const response = await axios.get(
@@ -323,10 +410,24 @@ const InstallationsPage = () => {
     text += `Type: ${rdv.type_rdv}\n`;
     text += `Adresse: ${rdv.adresse}, ${rdv.code_postal} ${rdv.ville}\n\n`;
 
-    if (rdv.praticiens && rdv.praticiens.length > 0) {
+    // Parser les praticiens si nécessaire (peut être une string JSON)
+    let praticiens = rdv.praticiens;
+    if (typeof praticiens === 'string') {
+      try {
+        praticiens = JSON.parse(praticiens);
+      } catch {
+        praticiens = [];
+      }
+    }
+
+    if (praticiens && Array.isArray(praticiens) && praticiens.length > 0) {
       text += `Praticiens:\n`;
-      rdv.praticiens.forEach(p => {
-        text += `- ${p.prenom} ${p.nom}\n`;
+      praticiens.forEach(p => {
+        if (typeof p === 'object' && p.prenom && p.nom) {
+          text += `- ${p.prenom} ${p.nom}\n`;
+        } else if (typeof p === 'string') {
+          text += `- ${p}\n`;
+        }
       });
       text += `\n`;
     }
@@ -656,17 +757,17 @@ const InstallationsPage = () => {
         </select>
       </div>
 
-      {/* Formulaire */}
+      {/* Formulaire simplifié - Prise de RDV uniquement */}
       {showForm && (
         <div className="bg-white border rounded-lg p-6 mb-6 shadow">
           <h3 className="text-xl font-semibold mb-4">
-            {editingRdv ? "Modifier le rendez-vous" : "Nouveau rendez-vous"}
+            {editingRdv ? "Modifier le rendez-vous" : "📅 Prise de rendez-vous"}
           </h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Remplissez uniquement les informations nécessaires à la prise de rendez-vous. Les détails d'intervention seront complétés après.
+          </p>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* SECTION 1 : PRISE DE RDV (Obligatoire) */}
-            <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mb-4">
-              <h4 className="text-md font-semibold mb-3 text-blue-700">📅 Prise de rendez-vous</h4>
-              <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Nom du cabinet *</label>
                   <input
@@ -736,29 +837,6 @@ const InstallationsPage = () => {
                     placeholder="contact@cabinet.fr"
                   />
                 </div>
-
-                {/* Champs essentiels spécifiques au type de RDV */}
-                {getEssentialFieldsForType(form.type_rdv).map(field => (
-                  <div key={field.name}>
-                    <label className="block text-sm font-medium mb-1">
-                      {field.label}
-                    </label>
-                    <input
-                      type={field.type}
-                      value={specificFields[field.name] || ""}
-                      onChange={(e) => setSpecificFields({ ...specificFields, [field.name]: e.target.value })}
-                      className="w-full border px-3 py-2 rounded"
-                      placeholder={field.label}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* SECTION 2 : DÉTAILS INTERVENTION (Optionnel - à compléter plus tard) */}
-            <div className="bg-gray-50 border-2 border-gray-300 rounded-lg p-4 mb-4">
-              <h4 className="text-md font-semibold mb-3 text-gray-700">🏥 Détails de l'intervention <span className="text-xs font-normal text-gray-500">(peut être complété plus tard)</span></h4>
-              <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="block text-sm font-medium mb-1">Adresse</label>
                   <input
@@ -806,85 +884,6 @@ const InstallationsPage = () => {
                   />
                 </div>
               </div>
-            </div>
-
-            {/* Champs détaillés selon le type de RDV - Dans section Détails */}
-            {getDetailedFieldsForType(form.type_rdv).length > 0 && (
-              <div className="bg-gray-50 border-2 border-gray-300 rounded-lg p-4 mb-4">
-                <h4 className="text-md font-semibold mb-3 text-gray-700">⚙️ Informations détaillées - {form.type_rdv}</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  {getDetailedFieldsForType(form.type_rdv).map(field => (
-                    <div key={field.name}>
-                      <label className="block text-sm font-medium mb-1">
-                        {field.label}
-                      </label>
-                      <input
-                        type={field.type}
-                        value={specificFields[field.name] || ""}
-                        onChange={(e) => setSpecificFields({ ...specificFields, [field.name]: e.target.value })}
-                        className="w-full border px-3 py-2 rounded"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Praticiens - Conditionnel selon le type - Dans section Détails */}
-            {shouldShowPraticiens(form.type_rdv) && (
-              <div className="bg-gray-50 border-2 border-gray-300 rounded-lg p-4 mb-4">
-                <label className="block text-sm font-medium mb-2 text-gray-700">👨‍⚕️ Praticiens</label>
-                <div className="flex gap-2 mb-2">
-                  <input
-                    type="text"
-                    placeholder="Nom"
-                    value={praticienForm.nom}
-                    onChange={(e) => setPraticienForm({ ...praticienForm, nom: e.target.value })}
-                    className="border px-3 py-2 rounded flex-1"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Prénom"
-                    value={praticienForm.prenom}
-                    onChange={(e) => setPraticienForm({ ...praticienForm, prenom: e.target.value })}
-                    className="border px-3 py-2 rounded flex-1"
-                  />
-                  <button
-                    type="button"
-                    onClick={addPraticien}
-                    className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-                  >
-                    +
-                  </button>
-                </div>
-                <div className="space-y-1">
-                  {form.praticiens.map((p, i) => (
-                    <div key={i} className="flex justify-between items-center bg-gray-100 px-3 py-2 rounded">
-                      <span>{p.prenom} {p.nom}</span>
-                      <button
-                        type="button"
-                        onClick={() => removePraticien(i)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Notes générales */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Notes générales</label>
-              <textarea
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                rows="3"
-                className="w-full border px-3 py-2 rounded"
-                placeholder="Notes complémentaires..."
-              />
-            </div>
 
             <div className="flex gap-2">
               <button
@@ -940,13 +939,86 @@ const InstallationsPage = () => {
               <div className="text-sm space-y-1 mb-3">
                 <p><strong>📅 Date:</strong> {rdv.date_rdv.split('T')[0].split('-').reverse().join('/')} à {rdv.heure_rdv}</p>
                 <p><strong>📍 Lieu:</strong> {rdv.adresse}, {rdv.code_postal} {rdv.ville}</p>
-                {rdv.praticiens && rdv.praticiens.length > 0 && (
-                  <p><strong>👥 Praticiens:</strong> {rdv.praticiens.map(p => `${p.prenom} ${p.nom}`).join(', ')}</p>
-                )}
-                {rdv.notes && <p><strong>📝 Notes:</strong> {rdv.notes}</p>}
+                {(() => {
+                  // Parser praticiens si nécessaire
+                  let praticiens = rdv.praticiens;
+                  if (typeof praticiens === 'string') {
+                    try {
+                      praticiens = JSON.parse(praticiens);
+                    } catch {
+                      praticiens = [];
+                    }
+                  }
+                  
+                  return praticiens && Array.isArray(praticiens) && praticiens.length > 0 && (
+                    <p><strong>👥 Praticiens:</strong> {praticiens.map(p => {
+                      if (typeof p === 'object' && p.prenom && p.nom) {
+                        return `${p.prenom} ${p.nom}`;
+                      } else if (typeof p === 'string') {
+                        return p;
+                      }
+                      return '';
+                    }).filter(Boolean).join(', ')}</p>
+                  );
+                })()}
                 {rdv.id_contrat && (
                   <p className="text-green-600"><strong>📄 Contrat lié:</strong> #{rdv.id_contrat}</p>
                 )}
+                
+                {/* Notes formatées avec champs spécifiques et checklist */}
+                {rdv.notes && (() => {
+                  try {
+                    const notesData = JSON.parse(rdv.notes);
+                    const hasSpecificFields = notesData.specificFields && Object.keys(notesData.specificFields).length > 0;
+                    const hasGeneralNotes = notesData.generalNotes && notesData.generalNotes.trim();
+                    const hasChecklist = notesData.checklist && notesData.checklist.length > 0;
+                    
+                    if (!hasSpecificFields && !hasGeneralNotes && !hasChecklist) return null;
+                    
+                    return (
+                      <div className="mt-2 border-t pt-2">
+                        <div className="max-h-40 overflow-y-auto bg-gray-50 rounded p-2 space-y-2">
+                          {/* Champs spécifiques */}
+                          {hasSpecificFields && (
+                            <div>
+                              <p className="font-semibold text-xs text-gray-700 mb-1">⚙️ Informations techniques:</p>
+                              <ul className="text-xs space-y-0.5 ml-3">
+                                {Object.entries(notesData.specificFields).map(([key, value]) => (
+                                  value && <li key={key} className="text-gray-700">• <span className="font-medium">{key.replace(/_/g, ' ')}:</span> {value}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          
+                          {/* Notes générales */}
+                          {hasGeneralNotes && (
+                            <div>
+                              <p className="font-semibold text-xs text-gray-700 mb-1">📝 Notes:</p>
+                              <p className="text-xs text-gray-600 whitespace-pre-line ml-3">{notesData.generalNotes}</p>
+                            </div>
+                          )}
+                          
+                          {/* Checklist */}
+                          {hasChecklist && (
+                            <div>
+                              <p className="font-semibold text-xs text-gray-700 mb-1">✓ Checklist ({notesData.checklist.filter(c => c.checked).length}/{notesData.checklist.length}):</p>
+                              <ul className="text-xs space-y-0.5 ml-3">
+                                {notesData.checklist.map(item => (
+                                  <li key={item.id} className={item.checked ? "text-green-700" : "text-gray-500"}>
+                                    {item.checked ? "✓" : "○"} {item.label}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  } catch (e) {
+                    // Si les notes ne sont pas au format JSON, afficher en texte brut
+                    return <p className="mt-2 text-xs text-gray-600 max-h-20 overflow-y-auto"><strong>📝 Notes:</strong> {rdv.notes}</p>;
+                  }
+                })()}
               </div>
 
               <div className="flex gap-2 flex-wrap">
@@ -1013,6 +1085,22 @@ const InstallationsPage = () => {
                     </button>
                   </>
                 )}
+                {rdv.id_contrat && (
+                  <button
+                    onClick={() => handleRegenerateContrat(rdv)}
+                    className="bg-pink-500 text-white px-3 py-1 rounded text-sm hover:bg-pink-600"
+                    title="Régénérer le contrat avec les données actuelles"
+                  >
+                    🔄 Régénérer contrat
+                  </button>
+                )}
+                <button
+                  onClick={() => setTreatmentModalRdv(rdv)}
+                  className="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600"
+                  title="Traiter l'intervention - Compléter les détails"
+                >
+                  🔧 Traiter
+                </button>
                 <button
                   onClick={() => handleEdit(rdv)}
                   className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
@@ -1136,9 +1224,28 @@ const InstallationsPage = () => {
                     
                     <div className="text-sm space-y-1">
                       <p><strong>📍</strong> {rdv.ville}</p>
-                      {rdv.praticiens && rdv.praticiens.length > 0 && (
-                        <p><strong>👥</strong> {rdv.praticiens.map(p => `${p.prenom} ${p.nom}`).join(', ')}</p>
-                      )}
+                      {(() => {
+                        // Parser praticiens si nécessaire
+                        let praticiens = rdv.praticiens;
+                        if (typeof praticiens === 'string') {
+                          try {
+                            praticiens = JSON.parse(praticiens);
+                          } catch {
+                            praticiens = [];
+                          }
+                        }
+                        
+                        return praticiens && Array.isArray(praticiens) && praticiens.length > 0 && (
+                          <p><strong>👥</strong> {praticiens.map(p => {
+                            if (typeof p === 'object' && p.prenom && p.nom) {
+                              return `${p.prenom} ${p.nom}`;
+                            } else if (typeof p === 'string') {
+                              return p;
+                            }
+                            return '';
+                          }).filter(Boolean).join(', ')}</p>
+                        );
+                      })()}
                       {rdv.notes && (
                         <p className="text-gray-700 mt-2">
                           <strong>📝 Notes:</strong> {rdv.notes.length > 100 ? rdv.notes.substring(0, 100) + '...' : rdv.notes}
@@ -1435,6 +1542,167 @@ const InstallationsPage = () => {
                 <p className="font-semibold text-green-800">Checklist complétée !</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Traitement RDV - Complétion des détails d'intervention */}
+      {treatmentModalRdv && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+              🔧 Traitement de l'intervention - {treatmentModalRdv.cabinet}
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Complétez les informations détaillées de l'intervention avant de la facturer
+            </p>
+
+            <div className="space-y-6">
+              {/* Informations de base (lecture seule) */}
+              <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+                <h3 className="font-bold text-blue-900 dark:text-blue-100 mb-2">📋 Informations du RDV</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm text-blue-800 dark:text-blue-200">
+                  <div><strong>Type:</strong> {treatmentModalRdv.type_rdv}</div>
+                  <div><strong>Date:</strong> {new Date(treatmentModalRdv.date_rdv).toLocaleDateString('fr-FR')}</div>
+                  <div><strong>Heure:</strong> {treatmentModalRdv.heure_rdv}</div>
+                  <div><strong>Téléphone:</strong> {treatmentModalRdv.telephone || 'Non renseigné'}</div>
+                  <div className="col-span-2"><strong>Email:</strong> {treatmentModalRdv.email || 'Non renseigné'}</div>
+                  <div className="col-span-2"><strong>Adresse:</strong> {treatmentModalRdv.adresse || 'Non renseignée'}, {treatmentModalRdv.code_postal} {treatmentModalRdv.ville}</div>
+                </div>
+              </div>
+
+              {/* Champs spécifiques selon le type */}
+              {getDetailedFieldsForType(treatmentModalRdv.type_rdv).length > 0 && (
+                <div className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                  <h3 className="font-bold text-gray-800 dark:text-white mb-3">⚙️ Informations techniques - {treatmentModalRdv.type_rdv}</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {getDetailedFieldsForType(treatmentModalRdv.type_rdv).map(field => (
+                      <div key={field.name}>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          {field.label}
+                        </label>
+                        <input
+                          type={field.type}
+                          value={treatmentForm.specificFields[field.name] || ''}
+                          onChange={(e) => setTreatmentForm({
+                            ...treatmentForm,
+                            specificFields: { ...treatmentForm.specificFields, [field.name]: e.target.value }
+                          })}
+                          className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-white"
+                          placeholder={field.label}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Praticiens */}
+              {shouldShowPraticiens(treatmentModalRdv.type_rdv) && (
+                <div className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                  <h3 className="font-bold text-gray-800 dark:text-white mb-3">👨‍⚕️ Praticiens</h3>
+                  <div className="flex gap-2 mb-3">
+                    <input
+                      type="text"
+                      placeholder="Nom"
+                      value={praticienForm.nom}
+                      onChange={(e) => setPraticienForm({ ...praticienForm, nom: e.target.value })}
+                      className="border border-gray-300 dark:border-gray-600 px-3 py-2 rounded flex-1 dark:bg-gray-700 dark:text-white"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Prénom"
+                      value={praticienForm.prenom}
+                      onChange={(e) => setPraticienForm({ ...praticienForm, prenom: e.target.value })}
+                      className="border border-gray-300 dark:border-gray-600 px-3 py-2 rounded flex-1 dark:bg-gray-700 dark:text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (praticienForm.nom && praticienForm.prenom) {
+                          setTreatmentForm({
+                            ...treatmentForm,
+                            praticiens: [...treatmentForm.praticiens, { ...praticienForm }]
+                          });
+                          setPraticienForm({ nom: '', prenom: '' });
+                        }
+                      }}
+                      className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                    >
+                      + Ajouter
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {treatmentForm.praticiens.map((p, i) => (
+                      <div key={i} className="flex justify-between items-center bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded">
+                        <span className="text-gray-800 dark:text-gray-200">{p.prenom} {p.nom}</span>
+                        <button
+                          type="button"
+                          onClick={() => setTreatmentForm({
+                            ...treatmentForm,
+                            praticiens: treatmentForm.praticiens.filter((_, index) => index !== i)
+                          })}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Notes générales */}
+              <div className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                <h3 className="font-bold text-gray-800 dark:text-white mb-3">📝 Notes de l'intervention</h3>
+                <textarea
+                  value={treatmentForm.notes}
+                  onChange={(e) => setTreatmentForm({ ...treatmentForm, notes: e.target.value })}
+                  rows="4"
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-white"
+                  placeholder="Notes complémentaires sur l'intervention..."
+                />
+              </div>
+
+              {/* Boutons d'action */}
+              <div className="flex gap-3">
+                <button
+                  onClick={async () => {
+                    // Sauvegarder les modifications du traitement
+                    try {
+                      const updatedNotes = JSON.stringify({
+                        specificFields: treatmentForm.specificFields,
+                        generalNotes: treatmentForm.notes
+                      });
+                      
+                      await axios.put(`http://localhost:4000/api/rendez-vous/${treatmentModalRdv.id_rdv}`, {
+                        praticiens: treatmentForm.praticiens,
+                        notes: updatedNotes
+                      });
+                      
+                      alert('Détails de l\'intervention sauvegardés !');
+                      setTreatmentModalRdv(null);
+                      fetchRendezvous();
+                    } catch (error) {
+                      console.error('Erreur sauvegarde:', error);
+                      alert('Erreur lors de la sauvegarde');
+                    }
+                  }}
+                  className="flex-1 bg-green-500 text-white px-6 py-3 rounded hover:bg-green-600 transition font-semibold"
+                >
+                  💾 Sauvegarder les détails
+                </button>
+                <button
+                  onClick={() => {
+                    setTreatmentModalRdv(null);
+                    setTreatmentForm({ specificFields: {}, praticiens: [], notes: '', checklist: [] });
+                  }}
+                  className="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 px-6 py-3 rounded hover:bg-gray-400 dark:hover:bg-gray-500 transition font-semibold"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

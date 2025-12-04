@@ -21,12 +21,9 @@ const Navbar = () => {
         </Link>
       </h2>
       <div style={styles.links}>
-        <Link style={styles.link} to="/contrats">Contrats</Link>
-        <Link style={styles.link} to="/contrats/nouveau">Nouveau contrat</Link>
-        <Link style={styles.link} to="/historique">Historique</Link>
-        <Link style={styles.link} to="/calendrier">Calendrier</Link>
-        <Link style={styles.link} to="/mes-stats">Mes Stats</Link>
         <Link style={styles.link} to="/installations">Rendez-vous</Link>
+        <Link style={styles.link} to="/calendrier">Calendrier</Link>
+        <Link style={styles.link} to="/contrats">Contrats</Link>
         <Link style={styles.link} to="/knowledge">📚 Base de connaissances</Link>
         
         {/* Admin link (visible uniquement pour les admins) */}
@@ -40,15 +37,6 @@ const Navbar = () => {
             👤 {user.prenom || user.username}
           </span>
         )}
-        
-        {/* Bouton Dark Mode */}
-        <button
-          onClick={toggleTheme}
-          style={styles.themeToggle}
-          title={darkMode ? "Mode clair" : "Mode sombre"}
-        >
-          {darkMode ? "☀️" : "🌙"}
-        </button>
 
         {/* Bouton Déconnexion */}
         <button

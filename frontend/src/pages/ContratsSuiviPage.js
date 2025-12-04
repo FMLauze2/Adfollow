@@ -5,6 +5,20 @@ const ContratsSuiviPage = () => {
   const [contrats, setContrats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dates, setDates] = useState({});
+
+  // Fonction pour formater les praticiens correctement
+  const formatPraticiens = (praticiens) => {
+    if (!praticiens || !Array.isArray(praticiens)) return 'Aucun';
+    
+    return praticiens.map(p => {
+      if (typeof p === 'object' && p.prenom && p.nom) {
+        return `${p.prenom} ${p.nom}`;
+      } else if (typeof p === 'string') {
+        return p;
+      }
+      return '';
+    }).filter(Boolean).join(', ') || 'Aucun';
+  };
   const [selectedContratId, setSelectedContratId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const contractsPerPage = 5;
@@ -177,6 +191,9 @@ const ContratsSuiviPage = () => {
 
   // 🔥 EDITION COMPLETE D'UN CONTRAT
   const openEditModal = (contrat) => {
+    // Remonter en haut IMMÉDIATEMENT avant d'ouvrir le modal
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    
     setEditingContrat(contrat);
     setEditForm({
       cabinet: contrat.cabinet,
@@ -196,20 +213,24 @@ const ContratsSuiviPage = () => {
     }
 
     try {
-      const response = await axios.put(`http://localhost:4000/api/contrats/${editingContrat.id_contrat}`, {
+      const payload = {
         ...editForm,
         email: editForm.email || null,
         date_envoi: dates[editingContrat.id_contrat]?.date_envoi || null,
         date_reception: dates[editingContrat.id_contrat]?.date_reception || null
-      });
-
-      // Mettre à jour la liste localement
-      setContrats(prev => prev.map(c => 
-        c.id_contrat === response.data.id_contrat ? response.data : c
-      ));
+      };
+      
+      console.log("Envoi de la modification avec email:", payload.email);
+      
+      const response = await axios.put(`http://localhost:4000/api/contrats/${editingContrat.id_contrat}`, payload);
+      
+      console.log("Réponse backend - email:", response.data.email);
 
       setEditingContrat(null);
       alert("Contrat modifié avec succès !");
+      
+      // Recharger la liste complète pour être sûr d'avoir les dernières données
+      await fetchContrats();
     } catch (err) {
       console.error("Erreur modification:", err);
       alert("Erreur lors de la modification");
@@ -305,7 +326,7 @@ Je me permets de vous relancer concernant le contrat de services pour ${contrat.
 Pour rappel, voici les informations du contrat :
 - Cabinet : ${contrat.cabinet}
 - Adresse : ${contrat.adresse}, ${contrat.code_postal} ${contrat.ville}
-- Praticiens : ${contrat.praticiens.join(', ')}
+- Praticiens : ${formatPraticiens(contrat.praticiens)}
 - Montant : ${contrat.prix}€
 
 Merci de me retourner le contrat signé et tamponné par email dans les meilleurs délais.`;
@@ -318,7 +339,7 @@ Veuillez trouver ci-joint le contrat de services pour ${contrat.cabinet}.
 Informations du contrat :
 - Cabinet : ${contrat.cabinet}
 - Adresse : ${contrat.adresse}, ${contrat.code_postal} ${contrat.ville}
-- Praticiens : ${contrat.praticiens.join(', ')}
+- Praticiens : ${formatPraticiens(contrat.praticiens)}
 - Montant : ${contrat.prix}€
 
 Merci de nous retourner le contrat signé et tamponné par email.`;
@@ -339,7 +360,7 @@ Merci de nous retourner le contrat signé et tamponné par email.`;
     setRegeneratingPdf(prev => ({ ...prev, [contrat.id_contrat]: true }));
     
     try {
-      // Appel PUT avec toutes les données existantes pour forcer la régénération
+      // Appel PUT avec toutes les données existantes pour forcer la régénération (y compris email)
       await axios.put(`http://localhost:4000/api/contrats/${contrat.id_contrat}`, {
         cabinet: contrat.cabinet,
         adresse: contrat.adresse,
@@ -347,6 +368,7 @@ Merci de nous retourner le contrat signé et tamponné par email.`;
         ville: contrat.ville,
         praticiens: contrat.praticiens,
         prix: contrat.prix,
+        email: contrat.email,
         date_envoi: contrat.date_envoi,
         date_reception: contrat.date_reception
       });
@@ -791,7 +813,7 @@ Merci de nous retourner le contrat signé et tamponné par email.`;
 
                 <div className="mb-3 text-sm text-gray-600">
                   <p><strong>Adresse :</strong> {selectedContrat.adresse}, {selectedContrat.code_postal} {selectedContrat.ville}</p>
-                  <p><strong>Praticiens :</strong> {selectedContrat.praticiens.join(", ")}</p>
+                  <p><strong>Praticiens :</strong> {formatPraticiens(selectedContrat.praticiens)}</p>
                   <p><strong>Prix :</strong> {selectedContrat.prix}€</p>
                 </div>
 

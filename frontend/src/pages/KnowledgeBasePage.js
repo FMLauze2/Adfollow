@@ -396,14 +396,38 @@ function KnowledgeBasePage() {
   return (
     <div className="max-w-7xl mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">📚 Base de connaissances</h1>
+        <h1 className="text-3xl font-bold text-gray-800 dark:text-white">📚 Base de connaissances</h1>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
         >
           {showForm ? "✕ Fermer" : "➕ Nouvel article"}
         </button>
       </div>
+      
+      {/* Instructions pour migration OneNote */}
+      {!showForm && articles.length === 0 && (
+        <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg p-6 mb-6">
+          <h3 className="text-lg font-bold text-blue-900 dark:text-blue-100 mb-3">
+            💡 Migrer depuis OneNote
+          </h3>
+          <p className="text-blue-800 dark:text-blue-200 mb-3">
+            Pour importer vos notes OneNote :
+          </p>
+          <ol className="list-decimal list-inside space-y-2 text-blue-800 dark:text-blue-200">
+            <li>Ouvrez votre page OneNote</li>
+            <li>Sélectionnez tout le contenu (Ctrl+A)</li>
+            <li>Copiez (Ctrl+C)</li>
+            <li>Cliquez sur "➕ Nouvel article" ci-dessus</li>
+            <li>Collez dans le champ "Contenu" (Ctrl+V) - Les images seront préservées !</li>
+            <li>Ajoutez un titre et une catégorie</li>
+            <li>Enregistrez</li>
+          </ol>
+          <p className="text-sm text-blue-600 dark:text-blue-300 mt-3">
+            ✨ Le copier-coller préserve la mise en forme et les images !
+          </p>
+        </div>
+      )}
 
       {/* Formulaire création/édition */}
       {showForm && (

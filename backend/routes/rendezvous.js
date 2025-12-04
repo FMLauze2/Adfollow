@@ -142,6 +142,17 @@ router.put('/:id', async (req, res) => {
       values.push(id_contrat);
     }
 
+    // Ajout des champs manquants
+    const { telephone, email } = req.body;
+    if (telephone !== undefined) {
+      updates.push(`telephone = $${paramCount++}`);
+      values.push(telephone);
+    }
+    if (email !== undefined) {
+      updates.push(`email = $${paramCount++}`);
+      values.push(email);
+    }
+
     if (updates.length === 0) {
       return res.status(400).json({ error: 'Aucune modification fournie' });
     }
@@ -158,7 +169,23 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'RDV non trouvé' });
     }
 
-    res.json(result.rows[0]);
+    const updatedRdv = result.rows[0];
+
+    // Si le RDV a un contrat associé et que l'email a été modifié, synchroniser avec le contrat
+    if (updatedRdv.id_contrat && email !== undefined) {
+      try {
+        await pool.query(
+          'UPDATE contrats SET email = $1 WHERE id_contrat = $2',
+          [email || null, updatedRdv.id_contrat]
+        );
+        console.log(`Email synchronisé avec le contrat #${updatedRdv.id_contrat}`);
+      } catch (syncErr) {
+        console.error('Erreur synchronisation email contrat:', syncErr);
+        // Ne pas bloquer la réponse si la synchro échoue
+      }
+    }
+
+    res.json(updatedRdv);
   } catch (err) {
     console.error('Erreur modification RDV:', err);
     res.status(500).json({ error: 'Erreur modification RDV' });
@@ -366,11 +393,11 @@ router.post('/:id/create-contrat', async (req, res) => {
       return res.status(400).json({ error: 'Un contrat existe déjà pour ce RDV' });
     }
     
-    // Créer le contrat avec les données du RDV
+    // Créer le contrat avec les données du RDV (y compris email)
     const contratResult = await pool.query(
       `INSERT INTO contrats 
-       (cabinet, adresse, code_postal, ville, praticiens, prix, date_envoi, date_creation) 
-       VALUES ($1, $2, $3, $4, $5, $6, NULL, NOW()) 
+       (cabinet, adresse, code_postal, ville, praticiens, prix, email, date_envoi, date_creation) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, NOW()) 
        RETURNING *`,
       [
         rdv.cabinet,
@@ -378,7 +405,8 @@ router.post('/:id/create-contrat', async (req, res) => {
         rdv.code_postal,
         rdv.ville,
         JSON.stringify(rdv.praticiens || []),
-        prix
+        prix,
+        rdv.email || null
       ]
     );
     
@@ -406,6 +434,72 @@ router.post('/:id/create-contrat', async (req, res) => {
   } catch (err) {
     console.error('Erreur création contrat depuis RDV:', err);
     res.status(500).json({ error: 'Erreur création contrat' });
+  }
+});
+
+// POST régénérer le contrat d'un RDV avec les données actuelles
+router.post('/:id/regenerate-contrat', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Récupérer le RDV
+    const rdvResult = await pool.query('SELECT * FROM rendez_vous WHERE id_rdv = $1', [id]);
+    
+    if (rdvResult.rows.length === 0) {
+      return res.status(404).json({ error: 'RDV non trouvé' });
+    }
+    
+    const rdv = rdvResult.rows[0];
+    
+    // Vérifier qu'il y a bien un contrat lié
+    if (!rdv.id_contrat) {
+      return res.status(400).json({ error: 'Aucun contrat lié à ce RDV' });
+    }
+    
+    // Récupérer le contrat
+    const contratResult = await pool.query('SELECT * FROM contrats WHERE id_contrat = $1', [rdv.id_contrat]);
+    
+    if (contratResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Contrat non trouvé' });
+    }
+    
+    const contrat = contratResult.rows[0];
+    
+    // Mettre à jour le contrat avec les données actuelles du RDV (y compris email)
+    const updatedContratResult = await pool.query(
+      `UPDATE contrats 
+       SET cabinet = $1, adresse = $2, code_postal = $3, ville = $4, praticiens = $5, email = $6
+       WHERE id_contrat = $7
+       RETURNING *`,
+      [
+        rdv.cabinet,
+        rdv.adresse,
+        rdv.code_postal,
+        rdv.ville,
+        JSON.stringify(rdv.praticiens || []),
+        rdv.email || null,
+        rdv.id_contrat
+      ]
+    );
+    
+    const updatedContrat = updatedContratResult.rows[0];
+    
+    // Parser les praticiens si nécessaire
+    if (typeof updatedContrat.praticiens === 'string') {
+      updatedContrat.praticiens = JSON.parse(updatedContrat.praticiens);
+    }
+    
+    // Régénérer le PDF du contrat
+    const { generateContratPDF } = require('../services/pdf/generateContratPDF');
+    await generateContratPDF(updatedContrat);
+    
+    res.json({ 
+      message: 'Contrat régénéré avec succès',
+      contrat: updatedContrat
+    });
+  } catch (err) {
+    console.error('Erreur régénération contrat:', err);
+    res.status(500).json({ error: 'Erreur régénération contrat' });
   }
 });
 
