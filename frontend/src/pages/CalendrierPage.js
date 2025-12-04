@@ -11,6 +11,7 @@ function CalendrierPage() {
   // Todo list
   const [selectedDate, setSelectedDate] = useState(null);
   const [showTodoPanel, setShowTodoPanel] = useState(false);
+  const [showDayView, setShowDayView] = useState(false);
   const [todos, setTodos] = useState([]);
   const [newTodoText, setNewTodoText] = useState('');
   const [loadingTodos, setLoadingTodos] = useState(false);
@@ -247,7 +248,11 @@ function CalendrierPage() {
                 className={`h-32 border rounded-lg p-2 overflow-y-auto cursor-pointer hover:shadow-md transition ${
                   isToday ? 'bg-blue-50 border-blue-400 border-2' : 'bg-white border-gray-200'
                 }`}
-                onClick={() => handleDayClick(date)}
+                onClick={() => {
+                  setSelectedDate(date);
+                  setShowDayView(true);
+                  setShowTodoPanel(true);
+                }}
               >
                 {/* Numéro du jour */}
                 <div className={`flex justify-between items-start mb-1 ${
@@ -491,6 +496,70 @@ function CalendrierPage() {
               >
                 Fermer
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Vue Jour Complète */}
+      {showDayView && selectedDate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowDayView(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto m-4" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b dark:border-gray-700 p-4 z-10">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                  📅 {selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                </h2>
+                <button onClick={() => setShowDayView(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 text-2xl">×</button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <h3 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-100">🗓️ Rendez-vous du jour</h3>
+              {getRdvForDate(selectedDate).length === 0 ? (
+                <p className="text-gray-500 dark:text-gray-400 text-center py-8">Aucun rendez-vous ce jour</p>
+              ) : (
+                <div className="space-y-3">
+                  {getRdvForDate(selectedDate).map(rdv => (
+                    <div
+                      key={rdv.id_rdv}
+                      onClick={() => {
+                        setShowDayView(false);
+                        handleRdvClick(rdv);
+                      }}
+                      className="border rounded-lg p-4 cursor-pointer hover:shadow-md transition"
+                      style={{
+                        backgroundColor: rdv.statut === 'Planifié' ? '#DBEAFE' : 
+                                       rdv.statut === 'Effectué' ? '#D1FAE5' :
+                                       rdv.statut === 'Facturé' ? '#FEF3C7' : '#FEE2E2',
+                        borderLeft: `4px solid ${
+                          rdv.statut === 'Planifié' ? '#3B82F6' : 
+                          rdv.statut === 'Effectué' ? '#10B981' :
+                          rdv.statut === 'Facturé' ? '#F59E0B' : '#EF4444'
+                        }`,
+                        color: '#1F2937'
+                      }}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <div className="text-xl font-bold" style={{color: '#1F2937'}}>{rdv.heure_rdv}</div>
+                          <div className="text-sm" style={{color: '#6B7280'}}>{rdv.type_rdv}</div>
+                        </div>
+                        <span className={`px-3 py-1 rounded text-sm font-semibold ${getStatusColor(rdv.statut)}`}>
+                          {rdv.statut}
+                        </span>
+                      </div>
+                      <div className="font-semibold mb-1" style={{color: '#1F2937'}}>{rdv.cabinet}</div>
+                      {(rdv.adresse || rdv.ville) && (
+                        <div className="text-sm" style={{color: '#4B5563'}}>📍 {rdv.adresse}, {rdv.code_postal} {rdv.ville}</div>
+                      )}
+                      {rdv.telephone && (
+                        <div className="text-sm" style={{color: '#4B5563'}}>📞 {rdv.telephone}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
