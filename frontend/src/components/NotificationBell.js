@@ -130,9 +130,16 @@ function NotificationBell() {
             <h3 className="font-bold text-lg dark:text-white">
               Notifications {unreadCount > 0 && `(${unreadCount})`}
             </h3>
-            {unreadCount > 0 && (
+            {unreadCount > 0 && notifications.some(n => n.type_notification !== 'facturation' && n.type_notification !== 'contrat_manquant') && (
               <button
-                onClick={markAllAsRead}
+                onClick={async () => {
+                  // Marquer comme lues uniquement les notifications qui ne sont pas de type facturation ou contrat_manquant
+                  for (const notif of notifications) {
+                    if (notif.type_notification !== 'facturation' && notif.type_notification !== 'contrat_manquant') {
+                      await markAsRead(notif.id_notification);
+                    }
+                  }
+                }}
                 className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400"
               >
                 Tout marquer comme lu
@@ -153,7 +160,12 @@ function NotificationBell() {
                   <div
                     key={notif.id_notification}
                     className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition"
-                    onClick={() => markAsRead(notif.id_notification)}
+                    onClick={() => {
+                      // Ne pas marquer comme lue si c'est une notification de facturation ou contrat manquant
+                      if (notif.type_notification !== 'facturation' && notif.type_notification !== 'contrat_manquant') {
+                        markAsRead(notif.id_notification);
+                      }
+                    }}
                   >
                     <div className="flex justify-between items-start mb-1">
                       <span className="font-semibold text-sm text-gray-900 dark:text-white">
@@ -164,11 +176,17 @@ function NotificationBell() {
                           ? 'bg-red-100 text-red-700' 
                           : notif.type_notification === '1heure'
                           ? 'bg-orange-100 text-orange-700'
+                          : notif.type_notification === 'facturation'
+                          ? 'bg-yellow-100 text-yellow-700'
+                          : notif.type_notification === 'contrat_manquant'
+                          ? 'bg-purple-100 text-purple-700'
                           : 'bg-blue-100 text-blue-700'
                       }`}>
                         {notif.type_notification === '15min' && '⚠️ 15min'}
                         {notif.type_notification === '1heure' && '⏰ 1h'}
                         {notif.type_notification === '1jour' && '📅 1 jour'}
+                        {notif.type_notification === 'facturation' && '💰 À facturer'}
+                        {notif.type_notification === 'contrat_manquant' && '📄 Contrat manquant'}
                       </span>
                     </div>
                     <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">

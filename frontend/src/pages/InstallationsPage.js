@@ -78,20 +78,28 @@ const InstallationsPage = () => {
     if (treatmentModalRdv) {
       let parsedSpecificFields = {};
       let parsedNotes = '';
+      let savedChecklist = [];
       
       try {
         const notesData = JSON.parse(treatmentModalRdv.notes || '{}');
         parsedSpecificFields = notesData.specificFields || {};
         parsedNotes = notesData.generalNotes || '';
+        savedChecklist = notesData.checklist || [];
       } catch {
         parsedNotes = treatmentModalRdv.notes || '';
       }
+      
+      // Charger la checklist pour ce type de RDV
+      const baseChecklist = getChecklistForType(treatmentModalRdv.type_rdv);
+      
+      // Si une checklist a été sauvegardée, l'utiliser, sinon utiliser la checklist de base
+      const checklist = savedChecklist.length > 0 ? savedChecklist : baseChecklist;
       
       setTreatmentForm({
         specificFields: parsedSpecificFields,
         praticiens: treatmentModalRdv.praticiens || [],
         notes: parsedNotes,
-        checklist: []
+        checklist: checklist
       });
     }
   }, [treatmentModalRdv]);
@@ -316,6 +324,30 @@ const InstallationsPage = () => {
         if (!rdv.email || rdv.email.trim() === "") {
           alert("❌ Vous devez renseigner l'email du cabinet avant de facturer cette installation.\n\nL'email est nécessaire pour l'envoi du contrat de service.\n\nVeuillez modifier le RDV et ajouter l'email.");
           return;
+        }
+        
+        // Proposer de créer un contrat si pas encore fait
+        if (!rdv.id_contrat) {
+          const createContrat = window.confirm("⚠️ Aucun contrat de service n'a été créé pour cette installation.\n\nVoulez-vous créer un contrat avant de facturer ?");
+          if (createContrat) {
+            const prix = prompt("Entrez le prix du contrat (€):");
+            if (prix && parseFloat(prix) > 0) {
+              try {
+                await axios.post(
+                  `http://localhost:4000/api/rendez-vous/${id}/create-contrat`,
+                  { prix: parseFloat(prix) }
+                );
+                alert("✓ Contrat créé avec succès !");
+                fetchRendezvous();
+              } catch (error) {
+                console.error("Erreur création contrat:", error);
+                alert(error.response?.data?.error || "Erreur lors de la création du contrat");
+                return;
+              }
+            } else {
+              return; // Annuler la facturation si pas de prix valide
+            }
+          }
         }
       }
     }
@@ -1670,6 +1702,52 @@ const InstallationsPage = () => {
                 </div>
               )}
 
+              {/* Checklist */}
+              {treatmentForm.checklist && treatmentForm.checklist.length > 0 && (
+                <div className="border rounded-lg p-4" style={{ backgroundColor: '#D1FAE5', borderColor: '#10B981' }}>
+                  <h3 className="font-bold mb-3" style={{ color: '#065F46', fontSize: '18px' }}>
+                    ✅ Checklist - {treatmentModalRdv.type_rdv}
+                  </h3>
+                  <div className="space-y-2">
+                    {treatmentForm.checklist.map((item, index) => (
+                      <label 
+                        key={index} 
+                        className="flex items-center gap-3 p-3 rounded cursor-pointer"
+                        style={{ 
+                          backgroundColor: '#FFFFFF',
+                          border: '1px solid #10B981'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={item.checked || false}
+                          onChange={(e) => {
+                            const updatedChecklist = [...treatmentForm.checklist];
+                            updatedChecklist[index] = { ...item, checked: e.target.checked };
+                            setTreatmentForm({ ...treatmentForm, checklist: updatedChecklist });
+                          }}
+                          className="w-5 h-5"
+                        />
+                        <span 
+                          className="flex-1"
+                          style={{ 
+                            color: '#000000',
+                            textDecoration: item.checked ? 'line-through' : 'none',
+                            fontWeight: '500',
+                            fontSize: '15px'
+                          }}
+                        >
+                          {item.label || item.text}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="mt-3" style={{ color: '#065F46', fontWeight: 'bold', fontSize: '14px' }}>
+                    Progression: {treatmentForm.checklist.filter(item => item.checked).length} / {treatmentForm.checklist.length}
+                  </div>
+                </div>
+              )}
+
               {/* Notes générales */}
               <div className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg p-4">
                 <h3 className="font-bold text-gray-800 dark:text-white mb-3">📝 Notes de l'intervention</h3>
@@ -1682,6 +1760,54 @@ const InstallationsPage = () => {
                 />
               </div>
 
+              {/* Génération de contrat pour Installation serveur */}
+              {treatmentModalRdv.type_rdv === 'Installation serveur' && !treatmentModalRdv.id_contrat && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <h3 className="font-bold text-blue-900 mb-3">📄 Contrat de service</h3>
+                  <p className="text-sm text-blue-700 mb-3">Créer un contrat de service pour cette installation</p>
+                  <div className="flex gap-3 items-end">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-blue-900 mb-1">Prix du contrat (€)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={contratPrix}
+                        onChange={(e) => setContratPrix(e.target.value)}
+                        placeholder="Ex: 240.00"
+                        className="w-full border border-blue-300 rounded px-3 py-2"
+                      />
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!contratPrix || parseFloat(contratPrix) <= 0) {
+                          alert('Veuillez entrer un prix valide');
+                          return;
+                        }
+                        setCreatingContrat(true);
+                        try {
+                          await axios.post(
+                            `http://localhost:4000/api/rendez-vous/${treatmentModalRdv.id_rdv}/create-contrat`,
+                            { prix: parseFloat(contratPrix) }
+                          );
+                          alert('Contrat créé avec succès !');
+                          setContratPrix('');
+                          fetchRendezvous();
+                        } catch (error) {
+                          console.error('Erreur:', error);
+                          alert(error.response?.data?.error || 'Erreur lors de la création du contrat');
+                        }
+                        setCreatingContrat(false);
+                      }}
+                      disabled={creatingContrat}
+                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
+                    >
+                      {creatingContrat ? '⏳' : '📄 Générer contrat'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Boutons d'action */}
               <div className="flex gap-3">
                 <button
@@ -1690,7 +1816,8 @@ const InstallationsPage = () => {
                     try {
                       const updatedNotes = JSON.stringify({
                         specificFields: treatmentForm.specificFields,
-                        generalNotes: treatmentForm.notes
+                        generalNotes: treatmentForm.notes,
+                        checklist: treatmentForm.checklist
                       });
                       
                       await axios.put(`http://localhost:4000/api/rendez-vous/${treatmentModalRdv.id_rdv}`, {
@@ -1706,9 +1833,37 @@ const InstallationsPage = () => {
                       alert('Erreur lors de la sauvegarde');
                     }
                   }}
-                  className="flex-1 bg-green-500 text-white px-6 py-3 rounded hover:bg-green-600 transition font-semibold"
+                  className="flex-1 bg-blue-500 text-white px-6 py-3 rounded hover:bg-blue-600 transition font-semibold"
                 >
                   💾 Sauvegarder les détails
+                </button>
+                <button
+                  onClick={async () => {
+                    // Marquer comme effectué et sauvegarder
+                    try {
+                      const updatedNotes = JSON.stringify({
+                        specificFields: treatmentForm.specificFields,
+                        generalNotes: treatmentForm.notes,
+                        checklist: treatmentForm.checklist
+                      });
+                      
+                      await axios.put(`http://localhost:4000/api/rendez-vous/${treatmentModalRdv.id_rdv}`, {
+                        statut: 'Effectué',
+                        praticiens: treatmentForm.praticiens,
+                        notes: updatedNotes
+                      });
+                      
+                      alert('Intervention marquée comme effectuée !');
+                      setTreatmentModalRdv(null);
+                      fetchRendezvous();
+                    } catch (error) {
+                      console.error('Erreur:', error);
+                      alert('Erreur lors de la sauvegarde');
+                    }
+                  }}
+                  className="flex-1 bg-green-500 text-white px-6 py-3 rounded hover:bg-green-600 transition font-semibold"
+                >
+                  ✓ Marquer comme Effectué
                 </button>
                 <button
                   onClick={() => {
