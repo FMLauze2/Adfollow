@@ -95,7 +95,11 @@ function NotificationBell() {
   };
 
   const formatDateTime = (dateRdv, heureRdv) => {
-    const date = new Date(dateRdv);
+    // Extraire la date sans conversion de fuseau horaire
+    const dateStr = typeof dateRdv === 'string' ? dateRdv.split('T')[0] : dateRdv;
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    
     const jour = date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
     return `${jour} à ${heureRdv}`;
   };
