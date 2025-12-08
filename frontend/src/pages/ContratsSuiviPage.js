@@ -605,7 +605,7 @@ Merci de nous retourner le contrat signé et tamponné par email.`;
                         </button>
                         <button
                           onClick={() => setEditingContrat(null)}
-                          className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 rounded"
+                          className="flex-1 bg-white text-red-600 font-medium py-2 rounded hover:bg-red-50 hover:text-red-700 border border-red-300 transition"
                         >
                           Annuler
                         </button>
@@ -920,7 +920,7 @@ Merci de nous retourner le contrat signé et tamponné par email.`;
                 <div className="flex gap-3 mt-4">
                   <button
                     onClick={() => setEmailModalContrat(null)}
-                    className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 rounded"
+                    className="flex-1 bg-white text-red-600 font-medium py-2 rounded hover:bg-red-50 hover:text-red-700 border border-red-300"
                   >
                     Fermer
                   </button>
@@ -961,7 +961,7 @@ Merci de nous retourner le contrat signé et tamponné par email.`;
               
               <button
                 onClick={() => setThunderbirdModalContrat(null)}
-                className="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-3 rounded"
+                className="w-full bg-white text-red-600 font-medium py-3 rounded hover:bg-red-50 hover:text-red-700 border border-red-300 transition"
               >
                 Annuler
               </button>

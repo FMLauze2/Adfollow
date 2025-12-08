@@ -492,7 +492,7 @@ function CalendrierPage() {
               </button>
               <button
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition"
+                className="px-4 py-2 bg-white text-red-600 hover:bg-red-50 hover:text-red-700 border border-red-300 rounded-lg transition"
               >
                 Fermer
               </button>

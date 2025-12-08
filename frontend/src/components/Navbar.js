@@ -25,6 +25,7 @@ const Navbar = () => {
         <Link style={styles.link} to="/installations">Rendez-vous</Link>
         <Link style={styles.link} to="/calendrier">Calendrier</Link>
         <Link style={styles.link} to="/contrats">Contrats</Link>
+        <Link style={styles.link} to="/dailyreports">📊 Daily Reports</Link>
         <Link style={styles.link} to="/knowledge">📚 Base de connaissances</Link>
         
         {/* Admin link (visible uniquement pour les admins) */}
