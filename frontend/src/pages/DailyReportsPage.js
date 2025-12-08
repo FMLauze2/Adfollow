@@ -15,8 +15,16 @@ const DailyReportsPage = () => {
   const [showEquipeManager, setShowEquipeManager] = useState(false);
   const [avancements, setAvancements] = useState([]);
   
+  const getTodayDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [form, setForm] = useState({
-    date_report: new Date().toISOString().split('T')[0],
+    date_report: getTodayDate(),
     id_sprint: '',
     equipe_avancement: '',
     objectifs_jour: '',
@@ -102,7 +110,7 @@ const DailyReportsPage = () => {
 
   const resetForm = () => {
     setForm({
-      date_report: new Date().toISOString().split('T')[0],
+      date_report: getTodayDate(),
       id_sprint: '',
       objectifs_jour: '',
       blocages: '',
@@ -171,7 +179,7 @@ const DailyReportsPage = () => {
               // Trouver le premier sprint actif pour le test
               const activeSprint = sprints.find(s => s.statut === 'en_cours');
               setForm({
-                date_report: new Date().toISOString().split('T')[0],
+                date_report: getTodayDate(),
                 id_sprint: activeSprint?.id_sprint || '',
                 equipe_avancement: `JD - Jean Dupont
 ✅ Hier : Travail sur US#156 - système notifications (80% complété)
