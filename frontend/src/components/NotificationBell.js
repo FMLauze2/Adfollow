@@ -94,6 +94,21 @@ function NotificationBell() {
     }
   };
 
+  const cleanupOldNotifications = async () => {
+    if (!window.confirm('Supprimer toutes les notifications pour les RDV du mois précédent et archivés ?')) {
+      return;
+    }
+
+    try {
+      const response = await axios.delete('http://localhost:4000/api/notifications/cleanup-old');
+      alert(`✅ ${response.data.deleted} notification(s) supprimée(s)`);
+      fetchNotifications();
+    } catch (error) {
+      console.error('Erreur nettoyage notifications:', error);
+      alert('❌ Erreur lors du nettoyage des notifications');
+    }
+  };
+
   const formatDateTime = (dateRdv, heureRdv) => {
     // Si pas de date (notifications sans RDV comme daily_manquant)
     if (!dateRdv || !heureRdv) {
@@ -131,27 +146,37 @@ function NotificationBell() {
       {showDropdown && (
         <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-[500px] overflow-hidden flex flex-col">
           {/* En-tête */}
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-            <h3 className="font-bold text-lg dark:text-white">
-              Notifications {unreadCount > 0 && `(${unreadCount})`}
-            </h3>
-            {unreadCount > 0 && notifications.some(n => n.type_notification !== 'facturation' && n.type_notification !== 'contrat_manquant' && n.type_notification !== 'daily_manquant') && (
-              <button
-                onClick={async () => {
-                  // Marquer comme lues uniquement les notifications qui ne sont pas persistantes
-                  for (const notif of notifications) {
-                    if (notif.type_notification !== 'facturation' && 
-                        notif.type_notification !== 'contrat_manquant' && 
-                        notif.type_notification !== 'daily_manquant') {
-                      await markAsRead(notif.id_notification);
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="font-bold text-lg dark:text-white">
+                Notifications {unreadCount > 0 && `(${unreadCount})`}
+              </h3>
+              {unreadCount > 0 && notifications.some(n => n.type_notification !== 'facturation' && n.type_notification !== 'contrat_manquant' && n.type_notification !== 'daily_manquant') && (
+                <button
+                  onClick={async () => {
+                    // Marquer comme lues uniquement les notifications qui ne sont pas persistantes
+                    for (const notif of notifications) {
+                      if (notif.type_notification !== 'facturation' && 
+                          notif.type_notification !== 'contrat_manquant' && 
+                          notif.type_notification !== 'daily_manquant') {
+                        await markAsRead(notif.id_notification);
+                      }
                     }
-                  }
-                }}
-                className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400"
-              >
-                Tout marquer comme lu
-              </button>
-            )}
+                  }}
+                  className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400"
+                >
+                  Tout marquer comme lu
+                </button>
+              )}
+            </div>
+            {/* Bouton nettoyage */}
+            <button
+              onClick={cleanupOldNotifications}
+              className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 hover:underline"
+              title="Supprimer les notifications pour les RDV du mois précédent et archivés"
+            >
+              🗑️ Nettoyer les anciennes notifications
+            </button>
           </div>
 
           {/* Liste des notifications */}

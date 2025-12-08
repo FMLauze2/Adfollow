@@ -9,3 +9,6 @@ frontend/build/
 
 # IDE
 .vscode/
+
+# Backend scripts (outils de développement)
+backend/scripts/

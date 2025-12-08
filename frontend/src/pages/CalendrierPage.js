@@ -7,6 +7,7 @@ function CalendrierPage() {
   const [loading, setLoading] = useState(true);
   const [selectedRdv, setSelectedRdv] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [draggedRdv, setDraggedRdv] = useState(null);
   
   // Todo list
   const [selectedDate, setSelectedDate] = useState(null);
@@ -30,7 +31,8 @@ function CalendrierPage() {
   const fetchRdv = async () => {
     setLoading(true);
     try {
-      const response = await axios.get("http://localhost:4000/api/rendez-vous");
+      // Inclure les RDV archivés dans le calendrier
+      const response = await axios.get("http://localhost:4000/api/rendez-vous?includeArchived=true");
       setRdvList(response.data || []);
     } catch (error) {
       console.error("Erreur lors du chargement des RDV:", error);
@@ -173,6 +175,50 @@ function CalendrierPage() {
     }
   };
 
+  // Gestion du drag & drop
+  const handleDragStart = (e, rdv) => {
+    e.stopPropagation();
+    setDraggedRdv(rdv);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = async (e, targetDate) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!draggedRdv || !targetDate) return;
+
+    try {
+      // Formater la date cible
+      const year = targetDate.getFullYear();
+      const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+      const day = String(targetDate.getDate()).padStart(2, '0');
+      const newDateString = `${year}-${month}-${day}`;
+
+      // Appeler l'API pour déplacer le RDV
+      const response = await axios.put(`http://localhost:4000/api/rendez-vous/${draggedRdv.id_rdv}/move`, {
+        date_rdv: newDateString
+      });
+
+      console.log('✅ RDV déplacé:', response.data);
+
+      // Recharger les RDV
+      await fetchRdv();
+      
+      alert(`✅ RDV "${draggedRdv.cabinet}" déplacé au ${targetDate.toLocaleDateString('fr-FR')}`);
+    } catch (error) {
+      console.error('❌ Erreur déplacement RDV:', error);
+      alert('❌ Erreur lors du déplacement du RDV: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setDraggedRdv(null);
+    }
+  };
+
   const monthName = currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   const days = getDaysInMonth();
   const today = new Date();
@@ -247,12 +293,14 @@ function CalendrierPage() {
                 key={index}
                 className={`h-32 border rounded-lg p-2 overflow-y-auto cursor-pointer hover:shadow-md transition ${
                   isToday ? 'bg-blue-50 border-blue-400 border-2' : 'bg-white border-gray-200'
-                }`}
+                } ${draggedRdv ? 'hover:bg-green-50 hover:border-green-400' : ''}`}
                 onClick={() => {
                   setSelectedDate(date);
                   setShowDayView(true);
                   setShowTodoPanel(true);
                 }}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, date)}
               >
                 {/* Numéro du jour */}
                 <div className={`flex justify-between items-start mb-1 ${
@@ -267,17 +315,28 @@ function CalendrierPage() {
                   {rdvForDay.slice(0, 3).map(rdv => (
                     <div
                       key={rdv.id_rdv}
-                      onClick={() => handleRdvClick(rdv)}
-                      className="text-xs p-1 rounded cursor-pointer hover:opacity-80 transition"
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, rdv)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRdvClick(rdv);
+                      }}
+                      className={`text-xs p-1 rounded cursor-move hover:opacity-80 transition ${
+                        rdv.archive ? 'opacity-60 border border-gray-400' : ''
+                      } ${draggedRdv?.id_rdv === rdv.id_rdv ? 'opacity-50 scale-95' : ''}`}
                       style={{
-                        backgroundColor: rdv.statut === 'Planifié' ? '#DBEAFE' : 
+                        backgroundColor: rdv.archive ? '#E5E7EB' :
+                                       rdv.statut === 'Planifié' ? '#DBEAFE' : 
                                        rdv.statut === 'Effectué' ? '#D1FAE5' :
                                        rdv.statut === 'Facturé' ? '#FEF3C7' : '#FEE2E2',
                         color: '#1F2937'
                       }}
-                      title={`${rdv.heure_rdv} - ${rdv.cabinet}`}
+                      title={`${rdv.heure_rdv} - ${rdv.cabinet}${rdv.archive ? ' (Archivé)' : ''} - Glisser pour déplacer`}
                     >
-                      <div className="font-semibold truncate">{rdv.heure_rdv}</div>
+                      <div className="font-semibold truncate flex items-center gap-1">
+                        {rdv.archive && <span>📦</span>}
+                        {rdv.heure_rdv}
+                      </div>
                       <div className="truncate">{rdv.cabinet}</div>
                     </div>
                   ))}
@@ -294,7 +353,7 @@ function CalendrierPage() {
         </div>
 
         {/* Légende */}
-        <div className="mt-6 flex justify-center gap-4 text-sm">
+        <div className="mt-6 flex justify-center gap-4 text-sm flex-wrap">
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-blue-200 rounded"></div>
             <span>Planifié</span>
@@ -306,6 +365,10 @@ function CalendrierPage() {
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-yellow-200 rounded"></div>
             <span>Facturé</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-gray-300 rounded border border-gray-400"></div>
+            <span>📦 Archivé</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-red-200 rounded"></div>
@@ -434,7 +497,14 @@ function CalendrierPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-start mb-4">
-              <h3 className="text-2xl font-bold text-gray-800">{selectedRdv.type_rdv}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-2xl font-bold text-gray-800">{selectedRdv.type_rdv}</h3>
+                {selectedRdv.archive && (
+                  <span className="bg-gray-500 text-white text-xs px-2 py-1 rounded font-semibold">
+                    📦 ARCHIVÉ
+                  </span>
+                )}
+              </div>
               <button
                 onClick={() => setShowModal(false)}
                 className="text-gray-500 hover:text-gray-700 text-2xl"
@@ -527,12 +597,16 @@ function CalendrierPage() {
                         setShowDayView(false);
                         handleRdvClick(rdv);
                       }}
-                      className="border rounded-lg p-4 cursor-pointer hover:shadow-md transition"
+                      className={`border rounded-lg p-4 cursor-pointer hover:shadow-md transition ${
+                        rdv.archive ? 'opacity-70 border-gray-400' : ''
+                      }`}
                       style={{
-                        backgroundColor: rdv.statut === 'Planifié' ? '#DBEAFE' : 
+                        backgroundColor: rdv.archive ? '#E5E7EB' :
+                                       rdv.statut === 'Planifié' ? '#DBEAFE' : 
                                        rdv.statut === 'Effectué' ? '#D1FAE5' :
                                        rdv.statut === 'Facturé' ? '#FEF3C7' : '#FEE2E2',
                         borderLeft: `4px solid ${
+                          rdv.archive ? '#9CA3AF' :
                           rdv.statut === 'Planifié' ? '#3B82F6' : 
                           rdv.statut === 'Effectué' ? '#10B981' :
                           rdv.statut === 'Facturé' ? '#F59E0B' : '#EF4444'
@@ -542,12 +616,22 @@ function CalendrierPage() {
                     >
                       <div className="flex justify-between items-start mb-2">
                         <div>
-                          <div className="text-xl font-bold" style={{color: '#1F2937'}}>{rdv.heure_rdv}</div>
+                          <div className="text-xl font-bold flex items-center gap-2" style={{color: '#1F2937'}}>
+                            {rdv.archive && <span className="text-sm">📦</span>}
+                            {rdv.heure_rdv}
+                          </div>
                           <div className="text-sm" style={{color: '#6B7280'}}>{rdv.type_rdv}</div>
                         </div>
-                        <span className={`px-3 py-1 rounded text-sm font-semibold ${getStatusColor(rdv.statut)}`}>
-                          {rdv.statut}
-                        </span>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className={`px-3 py-1 rounded text-sm font-semibold ${getStatusColor(rdv.statut)}`}>
+                            {rdv.statut}
+                          </span>
+                          {rdv.archive && (
+                            <span className="bg-gray-500 text-white text-xs px-2 py-0.5 rounded">
+                              Archivé
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="font-semibold mb-1" style={{color: '#1F2937'}}>{rdv.cabinet}</div>
                       {(rdv.adresse || rdv.ville) && (

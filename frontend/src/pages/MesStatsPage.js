@@ -38,7 +38,7 @@ const MesStatsPage = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const rdvRes = await axios.get("http://localhost:4000/api/rendez-vous");
+      const rdvRes = await axios.get("http://localhost:4000/api/rendez-vous?includeArchived=true");
       setRdvList(rdvRes.data || []);
     } catch (error) {
       console.error("Erreur chargement données:", error);
