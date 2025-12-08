@@ -261,6 +261,24 @@ const HomePage = () => {
             </a>
           </div>
         )}
+
+        {/* Bannière RDV à facturer */}
+        {!loading && rendezvous.filter(r => r.statut === 'Effectué' && !r.archive).length > 0 && (
+          <div className="rounded border border-purple-300 bg-purple-50 text-left p-4 flex items-center justify-between">
+            <div>
+              <p className="text-purple-800 font-semibold">
+                💰 {rendezvous.filter(r => r.statut === 'Effectué' && !r.archive).length} rendez-vous à facturer
+              </p>
+              <p className="text-purple-700 text-sm">Des RDV effectués sont en attente de facturation.</p>
+            </div>
+            <a
+              href="/installations"
+              className="ml-4 inline-block bg-purple-500 hover:bg-purple-600 text-white font-medium py-2 px-4 rounded"
+            >
+              Voir les RDV
+            </a>
+          </div>
+        )}
       </div>
 
       <h1 className="text-4xl font-bold mb-4 text-gray-800">Bienvenue sur Adfollow</h1>
