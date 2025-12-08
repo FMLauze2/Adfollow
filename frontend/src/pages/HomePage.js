@@ -8,6 +8,7 @@ const HomePage = () => {
   const [upcomingRdv, setUpcomingRdv] = useState([]);
   const [loading, setLoading] = useState(true);
   const [rendezvous, setRendezvous] = useState([]);
+  const [hasDailyReport, setHasDailyReport] = useState(true);
   
   // Recherche globale
   const [searchQuery, setSearchQuery] = useState("");
@@ -45,11 +46,24 @@ const HomePage = () => {
         }, 0);
         setOverdueCount(count);
 
+        // Fonction locale pour obtenir la date du jour sans décalage UTC
+        const getTodayDate = () => {
+          const today = new Date();
+          const year = today.getFullYear();
+          const month = String(today.getMonth() + 1).padStart(2, '0');
+          const day = String(today.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+
         // Fetch RDV et todos pour aujourd'hui
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayDate();
         
         const todosRes = await axios.get(`http://localhost:4000/api/todos?date=${today}`);
         setTodayTodos(todosRes.data || []);
+
+        // Vérifier si un daily report existe pour aujourd'hui
+        const dailyRes = await axios.get(`http://localhost:4000/api/dailyreports/date/${today}`);
+        setHasDailyReport(dailyRes.data && dailyRes.data.id_report);
 
         const rdvRes = await axios.get("http://localhost:4000/api/rendez-vous");
         setRendezvous(rdvRes.data || []);
@@ -136,8 +150,16 @@ const HomePage = () => {
     }
   };
 
+  const getTodayDateLocal = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const fetchTodayTodos = async () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayDateLocal();
     try {
       const todosRes = await axios.get(`http://localhost:4000/api/todos?date=${today}`);
       setTodayTodos(todosRes.data || []);
@@ -150,7 +172,7 @@ const HomePage = () => {
     if (!newTodoText.trim()) return;
     
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getTodayDateLocal();
       await axios.post("http://localhost:4000/api/todos", {
         texte: newTodoText,
         date_todo: today
@@ -186,6 +208,24 @@ const HomePage = () => {
     <div className="text-center py-12">
       {/* Bannières Notifications */}
       <div className="max-w-6xl mx-auto mb-6 space-y-4">
+        {/* Bannière Daily Report manquant */}
+        {!loading && !hasDailyReport && (
+          <div className="rounded border border-orange-300 bg-orange-50 text-left p-4 flex items-center justify-between">
+            <div>
+              <p className="text-orange-800 font-semibold">
+                📝 Compte rendu quotidien non saisi
+              </p>
+              <p className="text-orange-700 text-sm">N'oublie pas de remplir ton daily report du jour.</p>
+            </div>
+            <a
+              href="/dailyreports"
+              className="ml-4 inline-block bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded"
+            >
+              Saisir le daily
+            </a>
+          </div>
+        )}
+
         {/* Bannière RDV du jour */}
         {!loading && todayRdvCount > 0 && (
           <div className="rounded border border-blue-300 bg-blue-50 text-left p-4 flex items-center justify-between">
@@ -528,7 +568,7 @@ const HomePage = () => {
 
       {/* RDV du jour */}
       {!loading && (() => {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayDateLocal();
         const todayRdvList = rendezvous.filter(rdv => {
           if (!rdv.date_rdv || rdv.statut === 'Annulé') return false;
           return rdv.date_rdv.split('T')[0] === today;
@@ -593,7 +633,7 @@ const HomePage = () => {
             {upcomingRdv.map(rdv => {
               const rdvDate = new Date(rdv.date_rdv.split('T')[0]);
               const dateStr = rdvDate.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
-              const isToday = rdvDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
+              const isToday = rdv.date_rdv.split('T')[0] === getTodayDateLocal();
               
               return (
                 <div 
