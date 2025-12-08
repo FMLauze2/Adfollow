@@ -55,6 +55,8 @@ const InstallationsSuiviPage = ({ onRetour }) => {
   const [previewGrcText, setPreviewGrcText] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [autoArchiveDays, setAutoArchiveDays] = useState(90);
+  const [currentPage, setCurrentPage] = useState(1);
+  const rdvPerPage = 10;
 
   useEffect(() => {
     fetchRendezvous();
@@ -76,6 +78,11 @@ const InstallationsSuiviPage = ({ onRetour }) => {
       }
     }
   }, [rendezvous]);
+
+  // Réinitialiser la page à 1 quand les filtres changent
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, typeFilter, showArchived]);
 
   // Initialiser le formulaire de traitement quand le modal s'ouvre
   useEffect(() => {
@@ -788,16 +795,6 @@ const InstallationsSuiviPage = ({ onRetour }) => {
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
             <h3 className="font-bold text-gray-700 dark:text-gray-300">📦 Gestion des archives</h3>
-            <button
-              onClick={() => setShowArchived(!showArchived)}
-              className={`px-4 py-2 rounded font-semibold transition ${
-                showArchived 
-                  ? 'bg-orange-500 text-white hover:bg-orange-600' 
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              {showArchived ? '👁️ Voir les actifs' : '📦 Voir les archives'}
-            </button>
           </div>
           
           <div className="flex items-center gap-2">
@@ -1076,8 +1073,9 @@ const InstallationsSuiviPage = ({ onRetour }) => {
       {loading && !showForm ? (
         <p>Chargement...</p>
       ) : (
+        <>
         <div className="grid gap-4">
-          {filteredRdv.map(rdv => (
+          {filteredRdv.slice((currentPage - 1) * rdvPerPage, currentPage * rdvPerPage).map(rdv => (
             <div 
               key={rdv.id_rdv} 
               className={`border rounded-lg p-4 shadow ${
@@ -1308,6 +1306,30 @@ const InstallationsSuiviPage = ({ onRetour }) => {
             <p className="text-gray-500 text-center py-8">Aucun rendez-vous trouvé</p>
           )}
         </div>
+        
+        {/* Pagination */}
+        {filteredRdv.length > rdvPerPage && (
+          <div className="mt-6 flex items-center justify-center gap-4">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded"
+            >
+              ← Précédent
+            </button>
+            <span className="text-sm font-medium text-gray-700">
+              Page {currentPage} / {Math.ceil(filteredRdv.length / rdvPerPage)}
+            </span>
+            <button
+              onClick={() => setCurrentPage(Math.min(Math.ceil(filteredRdv.length / rdvPerPage), currentPage + 1))}
+              disabled={currentPage === Math.ceil(filteredRdv.length / rdvPerPage)}
+              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded"
+            >
+              Suivant →
+            </button>
+          </div>
+        )}
+        </>
       )}
 
       {/* Modal Marquer comme Effectué */}
@@ -2017,6 +2039,25 @@ const InstallationsSuiviPage = ({ onRetour }) => {
           </div>
         </div>
       )}
+
+      {/* Footer avec option archives */}
+      <div className="mt-8 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg border-t-2 border-gray-300 dark:border-gray-700">
+        <div className="flex items-center justify-center gap-4">
+          <button
+            onClick={() => setShowArchived(!showArchived)}
+            className={`px-4 py-2 rounded font-medium transition ${
+              showArchived 
+                ? 'bg-orange-500 text-white hover:bg-orange-600' 
+                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+            }`}
+          >
+            {showArchived ? '👁️ Voir les RDV actifs' : '📦 Voir les RDV archivés'}
+          </button>
+          <span className="text-sm text-gray-600 dark:text-gray-400">
+            {showArchived ? `${filteredRdv.length} RDV archivé(s)` : `${filteredRdv.length} RDV actif(s)`}
+          </span>
+        </div>
+      </div>
     </div>
   );
 };
