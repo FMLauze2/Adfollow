@@ -65,25 +65,25 @@ const HomePage = () => {
         const dailyRes = await axios.get(`http://localhost:4000/api/dailyreports/date/${today}`);
         setHasDailyReport(dailyRes.data && dailyRes.data.id_report);
 
-        const rdvRes = await axios.get("http://localhost:4000/api/rendez-vous");
+        // Inclure tous les RDV (y compris archivés) pour les statistiques
+        const rdvRes = await axios.get("http://localhost:4000/api/rendez-vous?includeArchived=true");
         setRendezvous(rdvRes.data || []);
         
         const todayRdv = (rdvRes.data || []).filter(rdv => {
           if (!rdv.date_rdv) return false;
           const rdvDate = rdv.date_rdv.split('T')[0];
           const isToday = rdvDate === today;
-          const notCancelled = rdv.statut !== 'Annulé'; // Compter Planifié ET Effectué
-          console.log(`RDV ${rdv.id_rdv}: ${rdvDate} === ${today}? ${isToday}, Statut: ${rdv.statut}`);
-          return isToday && notCancelled;
+          const notCancelled = rdv.statut !== 'Annulé';
+          const notArchived = !rdv.archive; // Exclure les archivés des stats du jour
+          return isToday && notCancelled && notArchived;
         });
         
-        console.log(`Total RDV aujourd'hui (non annulés): ${todayRdv.length}`);
         setTodayRdvCount(todayRdv.length);
 
-        // Fetch RDV à venir (prochains 14 jours, non annulés)
+        // Fetch RDV à venir (prochains 14 jours, non annulés, non archivés)
         const upcoming = (rdvRes.data || [])
           .filter(rdv => {
-            if (!rdv.date_rdv || rdv.statut === 'Annulé') return false;
+            if (!rdv.date_rdv || rdv.statut === 'Annulé' || rdv.archive) return false;
             const rdvDate = new Date(rdv.date_rdv.split('T')[0]);
             const todayDate = new Date(today);
             const in14Days = new Date(todayDate);
@@ -112,7 +112,7 @@ const HomePage = () => {
     try {
       const [contratsRes, rdvRes] = await Promise.all([
         axios.get("http://localhost:4000/api/contrats"),
-        axios.get("http://localhost:4000/api/rendez-vous")
+        axios.get("http://localhost:4000/api/rendez-vous?includeArchived=true")
       ]);
 
       const searchLower = query.toLowerCase().trim();
@@ -378,12 +378,13 @@ const HomePage = () => {
             <div className="text-sm opacity-90">RDV prochains 14j</div>
           </div>
           <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white rounded-lg p-4 shadow-lg">
-            <div className="text-3xl font-bold">{rendezvous.filter(r => r.statut === 'Effectué').length}</div>
+            <div className="text-3xl font-bold">{rendezvous.filter(r => r.statut === 'Effectué' && !r.archive).length}</div>
             <div className="text-sm opacity-90">À facturer</div>
           </div>
-          <div className="bg-gradient-to-br from-red-500 to-red-600 text-white rounded-lg p-4 shadow-lg">
-            <div className="text-3xl font-bold">{overdueCount}</div>
-            <div className="text-sm opacity-90">Contrats en retard</div>
+          <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg p-4 shadow-lg">
+            <div className="text-3xl font-bold">{rendezvous.length}</div>
+            <div className="text-sm opacity-90">Total RDV</div>
+            <div className="text-xs opacity-75 mt-1">{rendezvous.filter(r => r.archive).length} archivés</div>
           </div>
         </div>
       )}
@@ -564,6 +565,32 @@ const HomePage = () => {
             Comptes rendus
           </a>
         </div>
+
+        <div className="bg-white p-6 rounded shadow">
+          <h2 className="text-2xl font-semibold mb-2 text-pink-600">📚 Base de connaissances</h2>
+          <p className="text-gray-600 mb-4">
+            Accédez aux guides et documentations techniques.
+          </p>
+          <a
+            href="/knowledge"
+            className="inline-block bg-pink-500 hover:bg-pink-600 text-white font-medium py-2 px-4 rounded"
+          >
+            Voir la base
+          </a>
+        </div>
+
+        <div className="bg-white p-6 rounded shadow">
+          <h2 className="text-2xl font-semibold mb-2 text-cyan-600">📅 Calendrier</h2>
+          <p className="text-gray-600 mb-4">
+            Visualisez tous vos rendez-vous dans un calendrier.
+          </p>
+          <a
+            href="/calendrier"
+            className="inline-block bg-cyan-500 hover:bg-cyan-600 text-white font-medium py-2 px-4 rounded"
+          >
+            Voir le calendrier
+          </a>
+        </div>
       </div>
 
       {/* RDV du jour */}
@@ -581,11 +608,18 @@ const HomePage = () => {
               {todayRdvList.map(rdv => (
                 <div 
                   key={rdv.id_rdv} 
-                  className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 border-2 border-blue-500 dark:border-blue-400"
+                  className={`bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 border-2 ${
+                    rdv.archive 
+                      ? 'border-gray-400 opacity-60' 
+                      : 'border-blue-500 dark:border-blue-400'
+                  }`}
                 >
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex-1">
-                      <h3 className="font-bold text-gray-900 dark:text-white text-lg">{rdv.cabinet}</h3>
+                      <h3 className="font-bold text-gray-900 dark:text-white text-lg flex items-center gap-2">
+                        {rdv.archive && <span>📦</span>}
+                        {rdv.cabinet}
+                      </h3>
                       <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">{rdv.type_rdv}</p>
                     </div>
                     <span className={`text-xs px-2 py-1 rounded font-semibold ${

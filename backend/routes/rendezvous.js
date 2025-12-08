@@ -6,9 +6,16 @@ const generateICS = require('../services/ics/generateICS');
 // GET tous les RDV
 router.get('/', async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM rendez_vous ORDER BY date_rdv DESC, heure_rdv DESC'
-    );
+    const { includeArchived } = req.query;
+    let query = 'SELECT * FROM rendez_vous';
+    
+    if (includeArchived !== 'true') {
+      query += ' WHERE archive = FALSE OR archive IS NULL';
+    }
+    
+    query += ' ORDER BY date_rdv DESC, heure_rdv DESC';
+    
+    const result = await pool.query(query);
     res.json(result.rows);
   } catch (err) {
     console.error('Erreur récupération RDV:', err);
@@ -67,6 +74,37 @@ router.post('/', async (req, res) => {
   } catch (err) {
     console.error('Erreur création RDV:', err);
     res.status(500).json({ error: 'Erreur création RDV' });
+  }
+});
+
+// PUT déplacer un RDV (drag & drop dans calendrier)
+router.put('/:id/move', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { date_rdv } = req.body;
+
+    if (!date_rdv) {
+      return res.status(400).json({ error: 'Date requise' });
+    }
+
+    // Ajouter 1 jour pour compenser le décalage timezone lors du stockage
+    const dateParts = date_rdv.split('-');
+    const dateObj = new Date(Date.UTC(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]) + 1));
+    const correctedDate = dateObj.toISOString().split('T')[0];
+
+    const result = await pool.query(
+      'UPDATE rendez_vous SET date_rdv = $1::date WHERE id_rdv = $2 RETURNING *',
+      [correctedDate, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'RDV non trouvé' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Erreur déplacement RDV:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -542,6 +580,84 @@ router.get('/:id/ics', async (req, res) => {
   } catch (err) {
     console.error('Erreur génération ICS:', err);
     res.status(500).json({ error: 'Erreur génération fichier ICS' });
+  }
+});
+
+// POST /api/rendez-vous/archive/:id - Archiver un RDV
+router.post('/archive/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(
+      'UPDATE rendez_vous SET archive = TRUE WHERE id_rdv = $1 RETURNING *',
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'RDV non trouvé' });
+    }
+    
+    res.json({ success: true, rdv: result.rows[0] });
+  } catch (err) {
+    console.error('Erreur archivage RDV:', err);
+    res.status(500).json({ error: 'Erreur archivage RDV' });
+  }
+});
+
+// POST /api/rendez-vous/unarchive/:id - Désarchiver un RDV
+router.post('/unarchive/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(
+      'UPDATE rendez_vous SET archive = FALSE WHERE id_rdv = $1 RETURNING *',
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'RDV non trouvé' });
+    }
+    
+    res.json({ success: true, rdv: result.rows[0] });
+  } catch (err) {
+    console.error('Erreur désarchivage RDV:', err);
+    res.status(500).json({ error: 'Erreur désarchivage RDV' });
+  }
+});
+
+// POST /api/rendez-vous/auto-archive - Archiver automatiquement les RDV effectués/facturés du mois précédent
+router.post('/auto-archive', async (req, res) => {
+  try {
+    // Calculer le 1er jour du mois en cours
+    const today = new Date();
+    const firstDayOfCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const cutoffDateStr = firstDayOfCurrentMonth.toISOString().split('T')[0];
+    
+    // Archiver les RDV effectués et facturés avant le 1er du mois en cours
+    // SAUF les installations complètes sans contrat de service
+    const result = await pool.query(
+      `UPDATE rendez_vous 
+       SET archive = TRUE 
+       WHERE statut IN ('Effectué', 'Facturé') 
+       AND date_rdv < $1 
+       AND (archive = FALSE OR archive IS NULL)
+       AND NOT (
+         type_rdv IN ('Installation serveur', 'Installation serveur + postes', 'Installation complète')
+         AND id_contrat IS NULL
+       )
+       RETURNING id_rdv, cabinet, date_rdv, type_rdv`,
+      [cutoffDateStr]
+    );
+    
+    res.json({ 
+      success: true, 
+      archived: result.rowCount,
+      cutoffDate: cutoffDateStr,
+      rdvs: result.rows 
+    });
+  } catch (err) {
+    console.error('Erreur auto-archivage:', err);
+    res.status(500).json({ error: 'Erreur auto-archivage' });
   }
 });
 

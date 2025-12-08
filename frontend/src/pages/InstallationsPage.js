@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { getChecklistForType, getChecklistProgress } from "../utils/checklists";
+import ImportICS from "../components/ImportICS";
 
 const InstallationsPage = () => {
   const [rendezvous, setRendezvous] = useState([]);
@@ -49,12 +50,15 @@ const InstallationsPage = () => {
   const [creatingContrat, setCreatingContrat] = useState(false);
   const [checklistModalRdv, setChecklistModalRdv] = useState(null);
   const [currentChecklist, setCurrentChecklist] = useState([]);
+  const [showImportICS, setShowImportICS] = useState(false);
   const [previewGrcModal, setPreviewGrcModal] = useState(null);
   const [previewGrcText, setPreviewGrcText] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
+  const [autoArchiveDays, setAutoArchiveDays] = useState(90);
 
   useEffect(() => {
     fetchRendezvous();
-  }, []);
+  }, [showArchived]);
 
   // Gérer l'ouverture du modal depuis le calendrier
   useEffect(() => {
@@ -107,13 +111,60 @@ const InstallationsPage = () => {
   const fetchRendezvous = async () => {
     setLoading(true);
     try {
-      const response = await axios.get("http://localhost:4000/api/rendez-vous");
+      const url = showArchived 
+        ? "http://localhost:4000/api/rendez-vous?includeArchived=true"
+        : "http://localhost:4000/api/rendez-vous";
+      const response = await axios.get(url);
       setRendezvous(response.data || []);
     } catch (error) {
       console.error("Erreur chargement RDV:", error);
       alert("Erreur lors du chargement des rendez-vous");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleArchiveRdv = async (idRdv) => {
+    if (!window.confirm("Archiver ce rendez-vous ? Il sera masqué de la vue principale.")) return;
+    
+    try {
+      await axios.post(`http://localhost:4000/api/rendez-vous/archive/${idRdv}`);
+      alert("RDV archivé !");
+      fetchRendezvous();
+    } catch (error) {
+      console.error("Erreur archivage:", error);
+      alert("Erreur lors de l'archivage");
+    }
+  };
+
+  const handleUnarchiveRdv = async (idRdv) => {
+    try {
+      await axios.post(`http://localhost:4000/api/rendez-vous/unarchive/${idRdv}`);
+      alert("RDV restauré !");
+      fetchRendezvous();
+    } catch (error) {
+      console.error("Erreur désarchivage:", error);
+      alert("Erreur lors de la restauration");
+    }
+  };
+
+  const handleAutoArchive = async () => {
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const monthName = firstDayOfMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    
+    const confirmMsg = `Archiver automatiquement tous les RDV effectués et facturés avant ${monthName} ?\n\n` +
+                       `(Les installations complètes sans contrat de service seront préservées)`;
+    if (!window.confirm(confirmMsg)) return;
+    
+    try {
+      const response = await axios.post("http://localhost:4000/api/rendez-vous/auto-archive");
+      
+      alert(`✅ ${response.data.archived} RDV archivé(s) !`);
+      fetchRendezvous();
+    } catch (error) {
+      console.error("Erreur auto-archivage:", error);
+      alert("Erreur lors de l'archivage automatique");
     }
   };
 
@@ -701,12 +752,61 @@ const InstallationsPage = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Rendez-vous</h2>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-        >
-          {showForm ? "Annuler" : "+ Nouveau RDV"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            disabled
+            className="bg-gray-300 text-gray-500 px-4 py-2 rounded cursor-not-allowed flex items-center gap-2 opacity-60"
+            title="Fonctionnalité temporairement désactivée"
+          >
+            📥 Importer ICS
+          </button>
+          <button
+            onClick={() => {
+              setShowForm(!showForm);
+              if (showImportICS) setShowImportICS(false);
+            }}
+            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          >
+            {showForm ? "Annuler" : "+ Nouveau RDV"}
+          </button>
+        </div>
+      </div>
+
+      {/* Import ICS Component */}
+      {showImportICS && <ImportICS />}
+
+      {/* Section d'archivage */}
+      <div className="mb-6 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border-2 border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-4">
+            <h3 className="font-bold text-gray-700 dark:text-gray-300">📦 Gestion des archives</h3>
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              className={`px-4 py-2 rounded font-semibold transition ${
+                showArchived 
+                  ? 'bg-orange-500 text-white hover:bg-orange-600' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              {showArchived ? '👁️ Voir les actifs' : '📦 Voir les archives'}
+            </button>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleAutoArchive}
+              className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded font-semibold transition"
+            >
+              🗄️ Archiver mois précédent
+            </button>
+          </div>
+        </div>
+        
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+          💡 Archive automatiquement tous les RDV <strong>effectués et facturés</strong> du mois précédent (sauf installations complètes sans contrat).
+          <br />
+          ⚙️ L'archivage se fait aussi automatiquement chaque nuit à minuit.
+        </p>
       </div>
 
       {/* Filtres rapides */}
@@ -970,18 +1070,33 @@ const InstallationsPage = () => {
       ) : (
         <div className="grid gap-4">
           {filteredRdv.map(rdv => (
-            <div key={rdv.id_rdv} className="bg-white border rounded-lg p-4 shadow" data-date={rdv.date_rdv.split('T')[0]}>
+            <div 
+              key={rdv.id_rdv} 
+              className={`border rounded-lg p-4 shadow ${
+                rdv.archive 
+                  ? 'bg-gray-100 dark:bg-gray-700 border-gray-400 opacity-75' 
+                  : 'bg-white dark:bg-gray-800'
+              }`}
+              data-date={rdv.date_rdv.split('T')[0]}
+            >
               <div className="flex justify-between items-start mb-2">
-                <div>
-                  <h3 
-                    className="text-lg font-semibold text-gray-800 hover:text-gray-600 cursor-pointer flex items-center gap-2"
-                    onClick={() => setCabinetHistoryModal(rdv.cabinet)}
-                    title="Voir l'historique de ce cabinet"
-                  >
-                    {rdv.cabinet}
-                    <span className="text-xs text-gray-400 hover:text-gray-600">📂</span>
-                  </h3>
-                  <p className="text-sm text-gray-600">{rdv.type_rdv}</p>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 
+                      className="text-lg font-semibold text-gray-800 dark:text-gray-200 hover:text-gray-600 cursor-pointer flex items-center gap-2"
+                      onClick={() => setCabinetHistoryModal(rdv.cabinet)}
+                      title="Voir l'historique de ce cabinet"
+                    >
+                      {rdv.cabinet}
+                      <span className="text-xs text-gray-400 hover:text-gray-600">📂</span>
+                    </h3>
+                    {rdv.archive && (
+                      <span className="bg-gray-500 text-white text-xs px-2 py-1 rounded font-semibold">
+                        📦 ARCHIVÉ
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{rdv.type_rdv}</p>
                 </div>
                 {getStatusBadge(rdv)}
               </div>
@@ -1157,6 +1272,21 @@ const InstallationsPage = () => {
                 >
                   ✏️ Modifier
                 </button>
+                {rdv.archive ? (
+                  <button
+                    onClick={() => handleUnarchiveRdv(rdv.id_rdv)}
+                    className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600"
+                  >
+                    📂 Restaurer
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleArchiveRdv(rdv.id_rdv)}
+                    className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600"
+                  >
+                    📦 Archiver
+                  </button>
+                )}
                 <button
                   onClick={() => handleDelete(rdv.id_rdv)}
                   className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"

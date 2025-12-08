@@ -9,7 +9,7 @@ import Navbar from "./components/Navbar";
 import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
 import ContratFormPage from "./pages/ContratFormPage";
-import ContratsSuiviPage from "./pages/ContratsSuiviPage";
+import ContratsPage from "./pages/ContratsPage";
 import InstallationsPage from "./pages/InstallationsPage";
 import HistoriquePage from "./pages/HistoriquePage";
 import CalendrierPage from "./pages/CalendrierPage";
@@ -87,7 +87,7 @@ function AppContent() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
-          <Route path="/contrats" element={<ProtectedRoute><ContratsSuiviPage /></ProtectedRoute>} />
+          <Route path="/contrats" element={<ProtectedRoute><ContratsPage /></ProtectedRoute>} />
           <Route path="/contrats/nouveau" element={<ProtectedRoute><ContratFormPage /></ProtectedRoute>} />
           <Route path="/historique" element={<ProtectedRoute><HistoriquePage /></ProtectedRoute>} />
           <Route path="/calendrier" element={<ProtectedRoute><CalendrierPage /></ProtectedRoute>} />

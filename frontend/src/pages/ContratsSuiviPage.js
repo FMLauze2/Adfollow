@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useState } from "react";
 import axios from "axios";
 
-const ContratsSuiviPage = () => {
+const ContratsSuiviPage = ({ onRetour }) => {
   const [contrats, setContrats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dates, setDates] = useState({});
@@ -388,12 +388,22 @@ Merci de nous retourner le contrat signé et tamponné par email.`;
       <div className="p-6 pb-0">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-2xl font-bold text-gray-800">Suivi des Contrats</h1>
-          <a
-            href="/contrats/nouveau"
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition flex items-center gap-2"
-          >
-            ➕ Nouveau contrat
-          </a>
+          <div className="flex gap-2">
+            {onRetour && (
+              <button
+                onClick={onRetour}
+                className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition flex items-center gap-2"
+              >
+                ← Retour à la liste simple
+              </button>
+            )}
+            <a
+              href="/contrats/nouveau"
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition flex items-center gap-2"
+            >
+              ➕ Nouveau contrat
+            </a>
+          </div>
         </div>
         
               {/* BARRE DE RECHERCHE ET FILTRES */}
