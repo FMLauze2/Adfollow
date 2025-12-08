@@ -1,28 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import EquipeManager from '../components/EquipeManager';
+import AvancementEquipe from '../components/AvancementEquipe';
 
 const DailyReportsPage = () => {
   const [reports, setReports] = useState([]);
+  const [sprints, setSprints] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [showSprintForm, setShowSprintForm] = useState(false);
   const [editingReport, setEditingReport] = useState(null);
   const [viewingReport, setViewingReport] = useState(null);
   const [filterSprint, setFilterSprint] = useState('');
+  const [showEquipeManager, setShowEquipeManager] = useState(false);
+  const [avancements, setAvancements] = useState([]);
   
   const [form, setForm] = useState({
     date_report: new Date().toISOString().split('T')[0],
-    sprint_numero: '',
-    sprint_date_debut: '',
-    sprint_date_fin: '',
-    user_stories: '',
+    id_sprint: '',
+    equipe_avancement: '',
+    objectifs_jour: '',
     blocages: '',
-    points_positifs: '',
-    actions_demain: '',
     notes: ''
+  });
+
+  const [sprintForm, setSprintForm] = useState({
+    numero: '',
+    date_debut: '',
+    date_fin: '',
+    objectif: '',
+    statut: 'en_cours'
   });
 
   useEffect(() => {
     fetchReports();
+    fetchSprints();
   }, []);
 
   const fetchReports = async () => {
@@ -41,11 +53,16 @@ const DailyReportsPage = () => {
     e.preventDefault();
     
     try {
+      const data = {
+        ...form,
+        avancements: avancements
+      };
+      
       if (editingReport) {
-        await axios.put(`http://localhost:4000/api/dailyreports/${editingReport.id_report}`, form);
+        await axios.put(`http://localhost:4000/api/dailyreports/${editingReport.id_report}`, data);
         alert('Compte rendu mis à jour !');
       } else {
-        await axios.post('http://localhost:4000/api/dailyreports', form);
+        await axios.post('http://localhost:4000/api/dailyreports', data);
         alert('Compte rendu créé !');
       }
       
@@ -61,15 +78,12 @@ const DailyReportsPage = () => {
     setEditingReport(report);
     setForm({
       date_report: report.date_report.split('T')[0],
-      sprint_numero: report.sprint_numero || '',
-      sprint_date_debut: report.sprint_date_debut ? report.sprint_date_debut.split('T')[0] : '',
-      sprint_date_fin: report.sprint_date_fin ? report.sprint_date_fin.split('T')[0] : '',
-      user_stories: report.user_stories || '',
+      id_sprint: report.id_sprint || '',
+      objectifs_jour: report.objectifs_jour || '',
       blocages: report.blocages || '',
-      points_positifs: report.points_positifs || '',
-      actions_demain: report.actions_demain || '',
       notes: report.notes || ''
     });
+    setAvancements(report.avancements || []);
     setShowForm(true);
   };
 
@@ -89,24 +103,49 @@ const DailyReportsPage = () => {
   const resetForm = () => {
     setForm({
       date_report: new Date().toISOString().split('T')[0],
-      sprint_numero: '',
-      sprint_date_debut: '',
-      sprint_date_fin: '',
-      user_stories: '',
+      id_sprint: '',
+      objectifs_jour: '',
       blocages: '',
-      points_positifs: '',
-      actions_demain: '',
       notes: ''
     });
+    setAvancements([]);
     setEditingReport(null);
     setShowForm(false);
   };
 
-  const filteredReports = filterSprint
-    ? reports.filter(r => r.sprint_numero?.includes(filterSprint))
-    : reports;
+  const fetchSprints = async () => {
+    try {
+      const response = await axios.get('http://localhost:4000/api/sprints');
+      setSprints(response.data);
+    } catch (error) {
+      console.error('Erreur chargement sprints:', error);
+    }
+  };
 
-  const sprints = [...new Set(reports.map(r => r.sprint_numero).filter(Boolean))];
+  const handleSprintSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      await axios.post('http://localhost:4000/api/sprints', sprintForm);
+      alert('Sprint créé !');
+      setSprintForm({
+        numero: '',
+        date_debut: '',
+        date_fin: '',
+        objectif: '',
+        statut: 'en_cours'
+      });
+      setShowSprintForm(false);
+      fetchSprints();
+    } catch (error) {
+      console.error('Erreur:', error);
+      alert(error.response?.data?.error || 'Erreur lors de la création du sprint');
+    }
+  };
+
+  const filteredReports = filterSprint
+    ? reports.filter(r => r.id_sprint === parseInt(filterSprint))
+    : reports;
 
   return (
     <div className="p-6">
@@ -116,17 +155,49 @@ const DailyReportsPage = () => {
         </h1>
         <div className="flex gap-2">
           <button
+            onClick={() => setShowEquipeManager(true)}
+            className="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600"
+          >
+            👥 Gérer l'équipe
+          </button>
+          <button
+            onClick={() => setShowSprintForm(!showSprintForm)}
+            className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+          >
+            {showSprintForm ? '✕ Annuler' : '+ Nouveau Sprint'}
+          </button>
+          <button
             onClick={() => {
+              // Trouver le premier sprint actif pour le test
+              const activeSprint = sprints.find(s => s.statut === 'en_cours');
               setForm({
                 date_report: new Date().toISOString().split('T')[0],
-                sprint_numero: 'Sprint 23',
-                sprint_date_debut: '2025-12-02',
-                sprint_date_fin: '2025-12-15',
-                user_stories: 'US#156 - Ajout système de notifications persistantes\nUS#157 - Création module comptes rendus daily\nUS#158 - Amélioration système de checklists',
-                blocages: 'Attente validation design pour le module stats\nProblème de performance sur les requêtes de notifications',
-                points_positifs: 'Bonne progression sur le sprint\nÉquipe réactive et motivée\nNouvelles fonctionnalités bien reçues par les utilisateurs',
-                actions_demain: 'Finaliser la génération automatique de contrats\nCommencer US#159 - Dashboard statistiques\nRéunion de planning à 10h',
-                notes: 'Demo client prévue vendredi\nPoint technique à faire avec l\'équipe dev sur l\'architecture des notifications'
+                id_sprint: activeSprint?.id_sprint || '',
+                equipe_avancement: `JD - Jean Dupont
+✅ Hier : Travail sur US#156 - système notifications (80% complété)
+🎯 Aujourd'hui : Finaliser US#156 + Tests unitaires
+🚧 Blocages : RAS
+
+ML - Marie Leblanc
+✅ Hier : Debug modal traitement RDV, fix mode sombre
+🎯 Aujourd'hui : Commencer US#157 - checklists interventions
+🚧 Blocages : Attente specs détaillées pour checklist ambulanciers
+
+PT - Paul Tremblay
+✅ Hier : Génération PDF contrats - template finalisé
+🎯 Aujourd'hui : Intégration génération auto dans workflow
+🚧 Blocages : Problème performance sur requêtes complexes`,
+                objectifs_jour: `🎯 US#156 - Notifications persistantes (Jean) - Finalisation
+🎯 US#157 - Checklists interventions (Marie) - Démarrage
+🎯 US#158 - Génération contrats auto (Paul) - Intégration
+📊 Objectif : 3 US complétées cette semaine`,
+                blocages: `⚠️ Attente validation PO sur format checklist ambulanciers
+⚠️ Performance requêtes notifications à optimiser (index à ajouter)
+🔴 Démo client vendredi - pression sur les délais`,
+                notes: `✅ Démo prévue vendredi 14h avec le client
+✅ Sprint Review vendredi 16h
+📋 Préparer slides présentation pour démo
+💡 Envisager ajout cache Redis pour améliorer perfs`
               });
               setShowForm(true);
             }}
@@ -144,6 +215,105 @@ const DailyReportsPage = () => {
         </div>
       </div>
 
+      {/* Formulaire Sprint */}
+      {showSprintForm && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
+            Nouveau Sprint
+          </h2>
+          
+          <form onSubmit={handleSprintSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Numéro du sprint *
+                </label>
+                <input
+                  type="text"
+                  value={sprintForm.numero}
+                  onChange={(e) => setSprintForm({ ...sprintForm, numero: e.target.value })}
+                  placeholder="Sprint 23"
+                  required
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Statut
+                </label>
+                <select
+                  value={sprintForm.statut}
+                  onChange={(e) => setSprintForm({ ...sprintForm, statut: e.target.value })}
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="en_cours">En cours</option>
+                  <option value="termine">Terminé</option>
+                  <option value="archive">Archivé</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Date de début *
+                </label>
+                <input
+                  type="date"
+                  value={sprintForm.date_debut}
+                  onChange={(e) => setSprintForm({ ...sprintForm, date_debut: e.target.value })}
+                  required
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Date de fin *
+                </label>
+                <input
+                  type="date"
+                  value={sprintForm.date_fin}
+                  onChange={(e) => setSprintForm({ ...sprintForm, date_fin: e.target.value })}
+                  required
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Objectif du sprint
+              </label>
+              <textarea
+                value={sprintForm.objectif}
+                onChange={(e) => setSprintForm({ ...sprintForm, objectif: e.target.value })}
+                rows="3"
+                placeholder="Objectif principal de ce sprint..."
+                className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                className="bg-green-500 text-white px-6 py-2 rounded hover:bg-green-600"
+              >
+                Créer le sprint
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSprintForm(false)}
+                className="bg-white text-red-600 border border-red-300 px-6 py-2 rounded hover:bg-red-50"
+              >
+                Annuler
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* Filtres */}
       <div className="mb-6 flex gap-4">
         <div className="flex-1">
@@ -157,7 +327,9 @@ const DailyReportsPage = () => {
           >
             <option value="">Tous les sprints</option>
             {sprints.map(sprint => (
-              <option key={sprint} value={sprint}>{sprint}</option>
+              <option key={sprint.id_sprint} value={sprint.id_sprint}>
+                {sprint.numero} ({new Date(sprint.date_debut).toLocaleDateString()} - {new Date(sprint.date_fin).toLocaleDateString()})
+              </option>
             ))}
           </select>
         </div>
@@ -187,105 +359,66 @@ const DailyReportsPage = () => {
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Sprint (ex: Sprint 23)
+                  Sprint
                 </label>
-                <input
-                  type="text"
-                  value={form.sprint_numero}
-                  onChange={(e) => setForm({ ...form, sprint_numero: e.target.value })}
-                  placeholder="Sprint 23"
+                <select
+                  value={form.id_sprint}
+                  onChange={(e) => setForm({ ...form, id_sprint: e.target.value })}
                   className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-white"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Date début sprint
-                </label>
-                <input
-                  type="date"
-                  value={form.sprint_date_debut}
-                  onChange={(e) => setForm({ ...form, sprint_date_debut: e.target.value })}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-white"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Date fin sprint
-                </label>
-                <input
-                  type="date"
-                  value={form.sprint_date_fin}
-                  onChange={(e) => setForm({ ...form, sprint_date_fin: e.target.value })}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-white"
-                />
+                >
+                  <option value="">Aucun sprint</option>
+                  {sprints.filter(s => s.statut === 'en_cours').map(sprint => (
+                    <option key={sprint.id_sprint} value={sprint.id_sprint}>
+                      {sprint.numero} ({new Date(sprint.date_debut).toLocaleDateString()} - {new Date(sprint.date_fin).toLocaleDateString()})
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
             <div>
+              <AvancementEquipe 
+                reportId={editingReport?.id_report}
+                onSave={(data) => setAvancements(data)}
+                initialData={avancements}
+              />
+            </div>
+
+            <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                📋 User Stories traitées
+                🎯 Objectifs & User Stories du jour
               </label>
               <textarea
-                value={form.user_stories}
-                onChange={(e) => setForm({ ...form, user_stories: e.target.value })}
-                rows="4"
-                placeholder="US#123 - Ajout fonctionnalité X&#10;US#124 - Correction bug Y"
+                value={form.objectifs_jour}
+                onChange={(e) => setForm({ ...form, objectifs_jour: e.target.value })}
+                rows="5"
+                placeholder="🎯 US#156 - Notifications persistantes (Jean) - Finalisation&#10;🎯 US#157 - Checklists interventions (Marie) - Démarrage&#10;📊 Objectif : 3 US complétées cette semaine"
                 className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-white"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                🚧 Blocages rencontrés
+                🚧 Blocages & Risques
               </label>
               <textarea
                 value={form.blocages}
                 onChange={(e) => setForm({ ...form, blocages: e.target.value })}
-                rows="3"
-                placeholder="Problème API, attente validation..."
+                rows="4"
+                placeholder="⚠️ Attente validation PO...&#10;⚠️ Problème de performance...&#10;🔴 Démo client vendredi - pression délais"
                 className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-white"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                ✅ Points positifs
-              </label>
-              <textarea
-                value={form.points_positifs}
-                onChange={(e) => setForm({ ...form, points_positifs: e.target.value })}
-                rows="3"
-                placeholder="Bonne progression, équipe motivée..."
-                className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                📅 Actions prévues pour demain
-              </label>
-              <textarea
-                value={form.actions_demain}
-                onChange={(e) => setForm({ ...form, actions_demain: e.target.value })}
-                rows="3"
-                placeholder="Continuer US#125, réunion planning..."
-                className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                📝 Notes diverses
+                📝 Notes & Décisions
               </label>
               <textarea
                 value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                rows="3"
-                placeholder="Remarques, informations complémentaires..."
+                rows="4"
+                placeholder="✅ Démo prévue vendredi&#10;📋 Préparer slides&#10;💡 Idées d'amélioration..."
                 className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-white"
               />
             </div>
@@ -363,19 +496,64 @@ const DailyReportsPage = () => {
               </div>
 
               {/* Aperçu */}
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                {report.user_stories && (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {/* Avancements équipe */}
+                {report.avancements && report.avancements.length > 0 && (
                   <div>
-                    <strong className="text-gray-700 dark:text-gray-300">📋 User Stories:</strong>
-                    <p className="text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">{report.user_stories}</p>
+                    <strong className="text-gray-700 dark:text-gray-300 text-sm">👥 Avancement de l'équipe:</strong>
+                    <div className="mt-2 space-y-2">
+                      {report.avancements.map((av) => (
+                        <div key={av.id_avancement} className="bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center font-bold text-xs">
+                              {av.initiales}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-sm text-gray-800 dark:text-white">{av.nom_complet}</div>
+                              {av.role && <div className="text-xs text-gray-500 dark:text-gray-400">{av.role}</div>}
+                            </div>
+                          </div>
+                          <div className="space-y-1 text-xs ml-9">
+                            {av.hier && (
+                              <div>
+                                <span className="font-medium text-green-700 dark:text-green-400">✅ Hier : </span>
+                                <span className="text-gray-700 dark:text-gray-300">{av.hier}</span>
+                              </div>
+                            )}
+                            {av.aujourdhui && (
+                              <div>
+                                <span className="font-medium text-blue-700 dark:text-blue-400">🎯 Aujourd'hui : </span>
+                                <span className="text-gray-700 dark:text-gray-300">{av.aujourdhui}</span>
+                              </div>
+                            )}
+                            {av.blocages && (
+                              <div>
+                                <span className="font-medium text-red-700 dark:text-red-400">🚧 Blocages : </span>
+                                <span className="text-gray-700 dark:text-gray-300">{av.blocages}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
-                {report.blocages && (
-                  <div>
-                    <strong className="text-gray-700 dark:text-gray-300">🚧 Blocages:</strong>
-                    <p className="text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">{report.blocages}</p>
-                  </div>
-                )}
+                
+                {/* Objectifs et blocages */}
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  {report.objectifs_jour && (
+                    <div>
+                      <strong className="text-gray-700 dark:text-gray-300">🎯 Objectifs:</strong>
+                      <p className="text-gray-600 dark:text-gray-400 mt-1 line-clamp-2 whitespace-pre-line">{report.objectifs_jour}</p>
+                    </div>
+                  )}
+                  {report.blocages && (
+                    <div>
+                      <strong className="text-gray-700 dark:text-gray-300">🚧 Blocages:</strong>
+                      <p className="text-gray-600 dark:text-gray-400 mt-1 line-clamp-2 whitespace-pre-line">{report.blocages}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -415,37 +593,65 @@ const DailyReportsPage = () => {
             </div>
 
             <div className="space-y-6">
-              {viewingReport.user_stories && (
+              {/* Avancements par développeur */}
+              {viewingReport.avancements && viewingReport.avancements.length > 0 && (
                 <div>
-                  <h3 className="font-bold text-lg text-gray-800 dark:text-white mb-2">📋 User Stories traitées</h3>
-                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{viewingReport.user_stories}</p>
+                  <h3 className="font-bold text-lg text-gray-800 dark:text-white mb-3">👥 Avancement de l'équipe</h3>
+                  <div className="space-y-3">
+                    {viewingReport.avancements.map((av) => (
+                      <div key={av.id_avancement} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border-l-4 border-blue-500">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="bg-blue-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm">
+                            {av.initiales}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-gray-800 dark:text-white">{av.nom_complet}</div>
+                            {av.role && <div className="text-xs text-gray-600 dark:text-gray-400">{av.role}</div>}
+                          </div>
+                        </div>
+                        <div className="space-y-2 text-sm ml-11">
+                          {av.hier && (
+                            <div>
+                              <span className="font-medium text-gray-700 dark:text-gray-300">✅ Hier : </span>
+                              <span className="text-gray-600 dark:text-gray-400">{av.hier}</span>
+                            </div>
+                          )}
+                          {av.aujourdhui && (
+                            <div>
+                              <span className="font-medium text-gray-700 dark:text-gray-300">🎯 Aujourd'hui : </span>
+                              <span className="text-gray-600 dark:text-gray-400">{av.aujourdhui}</span>
+                            </div>
+                          )}
+                          {av.blocages && (
+                            <div>
+                              <span className="font-medium text-gray-700 dark:text-gray-300">🚧 Blocages : </span>
+                              <span className="text-gray-600 dark:text-gray-400">{av.blocages}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {viewingReport.objectifs_jour && (
+                <div>
+                  <h3 className="font-bold text-lg text-gray-800 dark:text-white mb-2">🎯 Objectifs & User Stories</h3>
+                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{viewingReport.objectifs_jour}</p>
                 </div>
               )}
 
               {viewingReport.blocages && (
                 <div>
-                  <h3 className="font-bold text-lg text-gray-800 dark:text-white mb-2">🚧 Blocages rencontrés</h3>
+                  <h3 className="font-bold text-lg text-gray-800 dark:text-white mb-2">🚧 Blocages & Risques</h3>
                   <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{viewingReport.blocages}</p>
-                </div>
-              )}
-
-              {viewingReport.points_positifs && (
-                <div>
-                  <h3 className="font-bold text-lg text-gray-800 dark:text-white mb-2">✅ Points positifs</h3>
-                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{viewingReport.points_positifs}</p>
-                </div>
-              )}
-
-              {viewingReport.actions_demain && (
-                <div>
-                  <h3 className="font-bold text-lg text-gray-800 dark:text-white mb-2">📅 Actions prévues pour demain</h3>
-                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{viewingReport.actions_demain}</p>
                 </div>
               )}
 
               {viewingReport.notes && (
                 <div>
-                  <h3 className="font-bold text-lg text-gray-800 dark:text-white mb-2">📝 Notes diverses</h3>
+                  <h3 className="font-bold text-lg text-gray-800 dark:text-white mb-2">📝 Notes & Décisions</h3>
                   <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{viewingReport.notes}</p>
                 </div>
               )}
@@ -459,6 +665,11 @@ const DailyReportsPage = () => {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Modal gestion équipe */}
+      {showEquipeManager && (
+        <EquipeManager onClose={() => setShowEquipeManager(false)} />
       )}
     </div>
   );
