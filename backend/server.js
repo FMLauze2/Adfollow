@@ -23,6 +23,7 @@ const rendezvousRoutes = require('./routes/rendezvous');
 const todoRoutes = require('./routes/todos');
 const knowledgeRoutes = require('./routes/knowledge');
 const notificationRoutes = require('./routes/notifications');
+const dailyreportsRoutes = require('./routes/dailyreports');
 const { router: authRoutes } = require('./routes/auth');
 
 // Import services
@@ -37,6 +38,7 @@ app.use('/api/rendez-vous', rendezvousRoutes);
 app.use('/api/todos', todoRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/dailyreports', dailyreportsRoutes);
 app.use('/api/auth', authRoutes);
 
 app.listen(4000, () => {

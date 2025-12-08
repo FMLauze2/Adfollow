@@ -95,6 +95,11 @@ function NotificationBell() {
   };
 
   const formatDateTime = (dateRdv, heureRdv) => {
+    // Si pas de date (notifications sans RDV comme daily_manquant)
+    if (!dateRdv || !heureRdv) {
+      return '';
+    }
+    
     // Extraire la date sans conversion de fuseau horaire
     const dateStr = typeof dateRdv === 'string' ? dateRdv.split('T')[0] : dateRdv;
     const [year, month, day] = dateStr.split('-').map(Number);
@@ -130,12 +135,14 @@ function NotificationBell() {
             <h3 className="font-bold text-lg dark:text-white">
               Notifications {unreadCount > 0 && `(${unreadCount})`}
             </h3>
-            {unreadCount > 0 && notifications.some(n => n.type_notification !== 'facturation' && n.type_notification !== 'contrat_manquant') && (
+            {unreadCount > 0 && notifications.some(n => n.type_notification !== 'facturation' && n.type_notification !== 'contrat_manquant' && n.type_notification !== 'daily_manquant') && (
               <button
                 onClick={async () => {
-                  // Marquer comme lues uniquement les notifications qui ne sont pas de type facturation ou contrat_manquant
+                  // Marquer comme lues uniquement les notifications qui ne sont pas persistantes
                   for (const notif of notifications) {
-                    if (notif.type_notification !== 'facturation' && notif.type_notification !== 'contrat_manquant') {
+                    if (notif.type_notification !== 'facturation' && 
+                        notif.type_notification !== 'contrat_manquant' && 
+                        notif.type_notification !== 'daily_manquant') {
                       await markAsRead(notif.id_notification);
                     }
                   }
@@ -161,16 +168,24 @@ function NotificationBell() {
                     key={notif.id_notification}
                     className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition"
                     onClick={() => {
-                      // Ne pas marquer comme lue si c'est une notification de facturation ou contrat manquant
-                      if (notif.type_notification !== 'facturation' && notif.type_notification !== 'contrat_manquant') {
+                      // Ne pas marquer comme lue si c'est une notification persistante
+                      if (notif.type_notification !== 'facturation' && 
+                          notif.type_notification !== 'contrat_manquant' && 
+                          notif.type_notification !== 'daily_manquant') {
                         markAsRead(notif.id_notification);
+                      }
+                      // Rediriger vers daily reports si c'est une notif daily manquant
+                      if (notif.type_notification === 'daily_manquant') {
+                        window.location.href = '/dailyreports';
                       }
                     }}
                   >
                     <div className="flex justify-between items-start mb-1">
-                      <span className="font-semibold text-sm text-gray-900 dark:text-white">
-                        {notif.cabinet}
-                      </span>
+                      {notif.cabinet && (
+                        <span className="font-semibold text-sm text-gray-900 dark:text-white">
+                          {notif.cabinet}
+                        </span>
+                      )}
                       <span className={`text-xs px-2 py-1 rounded ${
                         notif.type_notification === '15min' 
                           ? 'bg-red-100 text-red-700' 
@@ -180,6 +195,8 @@ function NotificationBell() {
                           ? 'bg-yellow-100 text-yellow-700'
                           : notif.type_notification === 'contrat_manquant'
                           ? 'bg-purple-100 text-purple-700'
+                          : notif.type_notification === 'daily_manquant'
+                          ? 'bg-teal-100 text-teal-700'
                           : 'bg-blue-100 text-blue-700'
                       }`}>
                         {notif.type_notification === '15min' && '⚠️ 15min'}
@@ -187,15 +204,20 @@ function NotificationBell() {
                         {notif.type_notification === '1jour' && '📅 1 jour'}
                         {notif.type_notification === 'facturation' && '💰 À facturer'}
                         {notif.type_notification === 'contrat_manquant' && '📄 Contrat manquant'}
+                        {notif.type_notification === 'daily_manquant' && '📊 Daily manquant'}
                       </span>
                     </div>
                     <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
                       {notif.message}
                     </p>
-                    <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
-                      <span>{formatDateTime(notif.date_rdv, notif.heure_rdv)}</span>
-                      <span>{notif.type_rdv}</span>
-                    </div>
+                    {(notif.date_rdv || notif.type_rdv) && (
+                      <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+                        {notif.date_rdv && notif.heure_rdv && (
+                          <span>{formatDateTime(notif.date_rdv, notif.heure_rdv)}</span>
+                        )}
+                        {notif.type_rdv && <span>{notif.type_rdv}</span>}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

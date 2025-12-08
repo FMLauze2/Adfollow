@@ -946,7 +946,7 @@ const InstallationsPage = () => {
               <button
                 type="button"
                 onClick={resetForm}
-                className="bg-gray-300 text-gray-700 px-6 py-2 rounded hover:bg-gray-400"
+                className="bg-white text-red-600 px-6 py-2 rounded hover:bg-red-50 hover:text-red-700 border border-red-300 transition"
               >
                 Annuler
               </button>
@@ -1234,7 +1234,7 @@ const InstallationsPage = () => {
 
             <button
               onClick={() => setCompleteModalRdv(null)}
-              className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 w-full"
+              className="bg-white text-red-600 px-4 py-2 rounded hover:bg-red-50 hover:text-red-700 border border-red-300 w-full"
             >
               Fermer
             </button>
@@ -1333,7 +1333,7 @@ const InstallationsPage = () => {
 
             <button
               onClick={() => setCabinetHistoryModal(null)}
-              className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 w-full mt-4"
+              className="bg-white text-red-600 px-4 py-2 rounded hover:bg-red-50 hover:text-red-700 border border-red-300 w-full mt-4"
             >
               Fermer
             </button>
@@ -1580,7 +1580,7 @@ const InstallationsPage = () => {
               </button>
               <button
                 onClick={() => setChecklistModalRdv(null)}
-                className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 transition"
+                className="bg-white text-red-600 px-4 py-2 rounded hover:bg-red-50 hover:text-red-700 border border-red-300 transition"
               >
                 Fermer
               </button>
@@ -1870,7 +1870,7 @@ const InstallationsPage = () => {
                     setTreatmentModalRdv(null);
                     setTreatmentForm({ specificFields: {}, praticiens: [], notes: '', checklist: [] });
                   }}
-                  className="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 px-6 py-3 rounded hover:bg-gray-400 dark:hover:bg-gray-500 transition font-semibold"
+                  className="bg-white text-red-600 px-6 py-3 rounded hover:bg-red-50 hover:text-red-700 border border-red-300 transition font-semibold"
                 >
                   Fermer
                 </button>

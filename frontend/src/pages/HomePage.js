@@ -511,6 +511,19 @@ const HomePage = () => {
             Créer un RDV
           </a>
         </div>
+
+        <div className="bg-white p-6 rounded shadow">
+          <h2 className="text-2xl font-semibold mb-2 text-teal-600">📊 Daily Report</h2>
+          <p className="text-gray-600 mb-4">
+            Saisissez votre compte rendu quotidien de sprint.
+          </p>
+          <a
+            href="/dailyreports"
+            className="inline-block bg-teal-500 hover:bg-teal-600 text-white font-medium py-2 px-4 rounded"
+          >
+            Comptes rendus
+          </a>
+        </div>
       </div>
 
       {/* RDV du jour */}

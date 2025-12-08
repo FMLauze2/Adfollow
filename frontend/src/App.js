@@ -17,6 +17,7 @@ import MesStatsPage from "./pages/MesStatsPage";
 import PraticiensPage from "./pages/PraticiensPage";
 import KnowledgeBasePage from "./pages/KnowledgeBasePage";
 import AdminPage from "./pages/AdminPage";
+import DailyReportsPage from "./pages/DailyReportsPage";
 import notificationManager from "./services/NotificationManager";
 
 // Composant pour protéger les routes
@@ -94,6 +95,7 @@ function AppContent() {
           <Route path="/installations" element={<ProtectedRoute><InstallationsPage /></ProtectedRoute>} />
           <Route path="/praticiens" element={<ProtectedRoute><PraticiensPage /></ProtectedRoute>} />
           <Route path="/knowledge" element={<ProtectedRoute><KnowledgeBasePage /></ProtectedRoute>} />
+          <Route path="/dailyreports" element={<ProtectedRoute><DailyReportsPage /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
         </Routes>
       </div>

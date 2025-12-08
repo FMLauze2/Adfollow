@@ -632,7 +632,7 @@ telnet 192.168.1.100 4900
                   <button
                     type="button"
                     onClick={resetForm}
-                    className="bg-gray-300 text-gray-700 px-6 py-2 rounded hover:bg-gray-400"
+                    className="bg-white text-red-600 px-6 py-2 rounded hover:bg-red-50 hover:text-red-700 border border-red-300 transition"
                   >
                     Annuler
                   </button>
@@ -903,7 +903,7 @@ telnet 192.168.1.100 4900
               </button>
               <button
                 onClick={() => setShowModal(false)}
-                className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300"
+                className="bg-white text-red-600 px-4 py-2 rounded hover:bg-red-50 hover:text-red-700 border border-red-300"
               >
                 Fermer
               </button>
@@ -963,7 +963,7 @@ telnet 192.168.1.100 4900
                   setShowCategoryModal(false);
                   setNewCategoryName('');
                 }}
-                className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                className="px-4 py-2 bg-white text-red-600 rounded hover:bg-red-50 hover:text-red-700 border border-red-300 transition"
               >
                 Annuler
               </button>

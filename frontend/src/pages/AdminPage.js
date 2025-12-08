@@ -415,7 +415,7 @@ function AdminPage() {
               <button
                 type="button"
                 onClick={resetForm}
-                className="bg-gray-300 text-gray-700 px-6 py-2 rounded hover:bg-gray-400"
+                className="bg-white text-red-600 px-6 py-2 rounded hover:bg-red-50 hover:text-red-700 border border-red-300 transition"
               >
                 Annuler
               </button>
