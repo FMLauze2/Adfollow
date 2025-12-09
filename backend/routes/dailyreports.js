@@ -6,7 +6,9 @@ const pool = require('../db');
 router.get('/', async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT dr.*, s.numero as sprint_numero, s.date_debut as sprint_date_debut, 
+      `SELECT dr.id_report, dr.date_report::text as date_report, dr.id_sprint, 
+              dr.objectifs_jour, dr.blocages, dr.notes, dr.created_at, dr.updated_at,
+              s.numero as sprint_numero, s.date_debut as sprint_date_debut, 
               s.date_fin as sprint_date_fin, s.objectif as sprint_objectif
        FROM daily_reports dr
        LEFT JOIN sprints s ON dr.id_sprint = s.id_sprint
@@ -38,7 +40,7 @@ router.get('/date/:date', async (req, res) => {
   try {
     const { date } = req.params;
     const result = await pool.query(
-      'SELECT * FROM daily_reports WHERE date_report = $1',
+      'SELECT id_report, date_report::text as date_report, id_sprint, objectifs_jour, blocages, notes, created_at, updated_at FROM daily_reports WHERE date_report::date = $1::date',
       [date]
     );
     
@@ -66,12 +68,55 @@ router.get('/date/:date', async (req, res) => {
   }
 });
 
+// Récupérer les "aujourd'hui" de la veille d'une date donnée pour pré-remplir le "hier"
+router.get('/yesterday-today/:date', async (req, res) => {
+  try {
+    const { date } = req.params; // Format YYYY-MM-DD
+    
+    console.log('Recherche des données de la veille pour le rapport du:', date);
+    
+    // Utiliser PostgreSQL pour calculer la date de la veille - beaucoup plus fiable !
+    const reportResult = await pool.query(
+      `SELECT id_report, date_report 
+       FROM daily_reports 
+       WHERE date_report::date = ($1::date - INTERVAL '1 day')::date`,
+      [date]
+    );
+    
+    if (reportResult.rows.length === 0) {
+      console.log('Aucun rapport trouvé pour la veille de', date);
+      return res.json([]); // Pas de rapport veille, retourner tableau vide
+    }
+    
+    const reportId = reportResult.rows[0].id_report;
+    console.log('Rapport trouvé:', reportResult.rows[0].date_report);
+    
+    // Récupérer les "aujourd'hui" de la veille pour chaque dev
+    const avancements = await pool.query(
+      `SELECT a.id_dev, a.aujourdhui as hier, d.nom_complet, d.initiales, d.role
+       FROM avancement_daily a
+       JOIN equipe_devs d ON a.id_dev = d.id_dev
+       WHERE a.id_report = $1
+       ORDER BY d.nom_complet`,
+      [reportId]
+    );
+    
+    console.log(`${avancements.rows.length} avancements trouvés`);
+    res.json(avancements.rows);
+  } catch (error) {
+    console.error('Erreur récupération yesterday-today:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // Récupérer les comptes rendus d'un sprint
 router.get('/sprint/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      `SELECT dr.*, s.numero as sprint_numero, s.date_debut as sprint_date_debut, 
+      `SELECT dr.id_report, dr.date_report::text as date_report, dr.id_sprint, 
+              dr.objectifs_jour, dr.blocages, dr.notes, dr.created_at, dr.updated_at,
+              s.numero as sprint_numero, s.date_debut as sprint_date_debut, 
               s.date_fin as sprint_date_fin, s.objectif as sprint_objectif
        FROM daily_reports dr
        LEFT JOIN sprints s ON dr.id_sprint = s.id_sprint

@@ -82,16 +82,39 @@ const DailyReportsPage = () => {
     }
   };
 
-  const handleEdit = (report) => {
+  const handleEdit = async (report) => {
     setEditingReport(report);
+    const reportDate = report.date_report; // Plus besoin de split car le backend retourne déjà au bon format
     setForm({
-      date_report: report.date_report.split('T')[0],
+      date_report: reportDate,
       id_sprint: report.id_sprint || '',
       objectifs_jour: report.objectifs_jour || '',
       blocages: report.blocages || '',
       notes: report.notes || ''
     });
-    setAvancements(report.avancements || []);
+    
+    // Charger les données de la veille pour cette date
+    const yesterdayData = await loadYesterdayData(reportDate);
+    
+    // Si des avancements existent déjà, fusionner avec les données de la veille
+    if (report.avancements && report.avancements.length > 0) {
+      // Créer une map des données de la veille
+      const yesterdayMap = {};
+      yesterdayData.forEach(item => {
+        yesterdayMap[item.id_dev] = item.hier;
+      });
+      
+      // Fusionner : garder les données existantes mais pré-remplir les "hier" vides
+      const merged = report.avancements.map(av => ({
+        ...av,
+        hier: av.hier || yesterdayMap[av.id_dev] || '' // Pré-remplir seulement si vide
+      }));
+      setAvancements(merged);
+    } else {
+      // Pas d'avancements existants, utiliser les données de la veille
+      setAvancements(yesterdayData);
+    }
+    
     setShowForm(true);
   };
 
@@ -119,6 +142,48 @@ const DailyReportsPage = () => {
     setAvancements([]);
     setEditingReport(null);
     setShowForm(false);
+  };
+
+  const loadYesterdayData = async (reportDate) => {
+    try {
+      // Récupérer tous les devs de l'équipe
+      const devsResponse = await axios.get('http://localhost:4000/api/equipe');
+      const allDevs = devsResponse.data;
+      
+      // Récupérer les données de la veille par rapport à la date du rapport
+      const yesterdayResponse = await axios.get(`http://localhost:4000/api/dailyreports/yesterday-today/${reportDate}`);
+      const yesterdayData = yesterdayResponse.data || [];
+      
+      // Créer une map pour accès rapide aux données d'hier
+      const yesterdayMap = {};
+      yesterdayData.forEach(item => {
+        yesterdayMap[item.id_dev] = item.hier; // Le "aujourd'hui" d'hier
+      });
+      
+      // Créer les avancements pour tous les devs avec pré-remplissage du "hier"
+      const prefilled = allDevs.map(dev => ({
+        id_dev: dev.id_dev,
+        nom_complet: dev.nom_complet,
+        initiales: dev.initiales,
+        role: dev.role,
+        hier: yesterdayMap[dev.id_dev] || '', // Pré-remplir avec le "aujourd'hui" d'hier s'il existe
+        aujourdhui: '',
+        blocages: ''
+      }));
+      
+      return prefilled;
+    } catch (error) {
+      console.error('Erreur chargement données de la veille:', error);
+      return [];
+    }
+  };
+
+  const openNewReportForm = async () => {
+    resetForm();
+    const todayDate = getTodayDate();
+    const prefilled = await loadYesterdayData(todayDate);
+    setAvancements(prefilled);
+    setShowForm(true);
   };
 
   const fetchSprints = async () => {
@@ -215,7 +280,13 @@ PT - Paul Tremblay
             🧪 Test
           </button>
           <button
-            onClick={() => setShowForm(!showForm)}
+            onClick={() => {
+              if (showForm) {
+                resetForm();
+              } else {
+                openNewReportForm();
+              }
+            }}
             className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
           >
             {showForm ? '✕ Annuler' : '+ Nouveau Daily'}
@@ -359,7 +430,32 @@ PT - Paul Tremblay
                 <input
                   type="date"
                   value={form.date_report}
-                  onChange={(e) => setForm({ ...form, date_report: e.target.value })}
+                  onChange={async (e) => {
+                    const newDate = e.target.value;
+                    setForm({ ...form, date_report: newDate });
+                    
+                    // Recharger automatiquement les données de la veille pour cette nouvelle date
+                    if (newDate) {
+                      const yesterdayData = await loadYesterdayData(newDate);
+                      
+                      if (editingReport) {
+                        // En mode édition : fusionner avec les données existantes
+                        const yesterdayMap = {};
+                        yesterdayData.forEach(item => {
+                          yesterdayMap[item.id_dev] = item.hier;
+                        });
+                        
+                        const merged = avancements.map(av => ({
+                          ...av,
+                          hier: yesterdayMap[av.id_dev] || av.hier || ''
+                        }));
+                        setAvancements(merged);
+                      } else {
+                        // Nouveau rapport : remplacer complètement
+                        setAvancements(yesterdayData);
+                      }
+                    }
+                  }}
                   required
                   className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-white"
                 />
@@ -463,7 +559,7 @@ PT - Paul Tremblay
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h3 className="text-xl font-bold text-gray-800 dark:text-white">
-                    {new Date(report.date_report).toLocaleDateString('fr-FR', {
+                    {new Date(report.date_report + 'T12:00:00').toLocaleDateString('fr-FR', {
                       weekday: 'long',
                       year: 'numeric',
                       month: 'long',
@@ -579,7 +675,7 @@ PT - Paul Tremblay
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-                  Daily du {new Date(viewingReport.date_report).toLocaleDateString('fr-FR', {
+                  Daily du {new Date(viewingReport.date_report + 'T12:00:00').toLocaleDateString('fr-FR', {
                     weekday: 'long',
                     year: 'numeric',
                     month: 'long',
