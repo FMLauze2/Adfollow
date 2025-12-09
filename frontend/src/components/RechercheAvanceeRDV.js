@@ -105,7 +105,7 @@ const RechercheAvanceeRDV = ({ rdvList, filters, onFilterChange, sortOptions, on
             </div>
           </li>
         ))}
-      </ul>//test
+      </ul>
     </div> 
   );
 };
