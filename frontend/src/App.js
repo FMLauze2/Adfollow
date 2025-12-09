@@ -11,6 +11,7 @@ import HomePage from "./pages/HomePage";
 import ContratFormPage from "./pages/ContratFormPage";
 import ContratsPage from "./pages/ContratsPage";
 import InstallationsPage from "./pages/InstallationsPage";
+import InstallationsSuiviPage from "./pages/InstallationsSuiviPage";
 import HistoriquePage from "./pages/HistoriquePage";
 import CalendrierPage from "./pages/CalendrierPage";
 import MesStatsPage from "./pages/MesStatsPage";
@@ -93,6 +94,7 @@ function AppContent() {
           <Route path="/calendrier" element={<ProtectedRoute><CalendrierPage /></ProtectedRoute>} />
           <Route path="/mes-stats" element={<ProtectedRoute><MesStatsPage /></ProtectedRoute>} />
           <Route path="/installations" element={<ProtectedRoute><InstallationsPage /></ProtectedRoute>} />
+          <Route path="/installations/suivi" element={<ProtectedRoute><InstallationsSuiviPage /></ProtectedRoute>} />
           <Route path="/praticiens" element={<ProtectedRoute><PraticiensPage /></ProtectedRoute>} />
           <Route path="/knowledge" element={<ProtectedRoute><KnowledgeBasePage /></ProtectedRoute>} />
           <Route path="/dailyreports" element={<ProtectedRoute><DailyReportsPage /></ProtectedRoute>} />

@@ -2,10 +2,22 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { getChecklistForType, getChecklistProgress } from "../utils/checklists";
 import ImportICS from "../components/ImportICS";
+import RechercheAvanceeRDV from "../components/RechercheAvanceeRDV";
 // Modale InfosManquantesModal intégrée localement, pas d'import nécessaire
 
 const InstallationsSuiviPage = ({ onRetour }) => {
     const [sortOption, setSortOption] = useState("date_desc");
+    const [showForm, setShowForm] = useState(false);
+    // ...existing code...
+
+    // Scroll automatique en haut dès que le formulaire s'affiche
+    useEffect(() => {
+      if (showForm) {
+        setTimeout(() => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 100);
+      }
+    }, [showForm]);
 
     const sortRdv = (rdvList) => {
       const sorted = [...rdvList];
@@ -41,7 +53,6 @@ const InstallationsSuiviPage = ({ onRetour }) => {
   const [cabinetHistoryModal, setCabinetHistoryModal] = useState(null);
   
   // Form state
-  const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     cabinet: "",
     date_rdv: "",
@@ -215,12 +226,16 @@ const InstallationsSuiviPage = ({ onRetour }) => {
       "Installation poste secondaire",
       "Changement de poste serveur"
     ];
-    if (installationTypes.includes(form.type_rdv)) {
-      const requiredFields = [form.email, form.adresse, form.code_postal, form.ville, form.praticiens];
-      if (requiredFields.some(f => !f || (typeof f === "string" ? f.trim() === "" : Array.isArray(f) ? f.length === 0 : false))) {
-        alert("❌ Merci de remplir tous les champs obligatoires : Email, Adresse, Code Postal, Ville et Praticiens.");
-        return;
-      }
+        if (installationTypes.includes(form.type_rdv)) {
+          // Validation stricte : tous les champs string doivent être non vides, praticiens doit être un array non vide
+          if (!form.email || typeof form.email !== "string" || form.email.trim() === "" ||
+              !form.adresse || typeof form.adresse !== "string" || form.adresse.trim() === "" ||
+              !form.code_postal || typeof form.code_postal !== "string" || form.code_postal.trim() === "" ||
+              !form.ville || typeof form.ville !== "string" || form.ville.trim() === "" ||
+              !Array.isArray(form.praticiens) || form.praticiens.length === 0) {
+            alert("❌ Merci de remplir tous les champs obligatoires : Email, Adresse, Code Postal, Ville et Praticiens.");
+            return;
+          }
     }
     setLoading(true);
     
@@ -381,19 +396,19 @@ const InstallationsSuiviPage = ({ onRetour }) => {
   const handleComplete = async (rdv) => {
     // Validation praticiens pour les installations
     const typeNeedsPraticiens = ["Installation serveur", "Formation", "Démo"];
-    if (typeNeedsPraticiens.includes(rdv.type_rdv)) {
-      if (!rdv.praticiens || rdv.praticiens.length === 0) {
-        alert("❌ Vous devez renseigner au moins un praticien avant de marquer ce RDV comme effectué.\n\nVeuillez modifier le RDV et ajouter les praticiens.");
-        return;
-      }
-    }
-    
-    // Validation email obligatoire pour Installation serveur
-    if (rdv.type_rdv === "Installation serveur") {
-      if (!rdv.email || rdv.email.trim() === "") {
-        alert("❌ Vous devez renseigner l'email du cabinet avant de marquer cette installation comme effectuée.\n\nL'email est nécessaire pour l'envoi du contrat de service.\n\nVeuillez modifier le RDV et ajouter l'email.");
-        return;
-      }
+        if (typeNeedsPraticiens.includes(rdv.type_rdv)) {
+          if (!Array.isArray(rdv.praticiens) || rdv.praticiens.length === 0) {
+            alert("❌ Vous devez renseigner au moins un praticien avant de marquer ce RDV comme effectué.\n\nVeuillez modifier le RDV et ajouter les praticiens.");
+            return;
+          }
+        }
+        
+        // Validation email obligatoire pour Installation serveur
+        if (rdv.type_rdv === "Installation serveur") {
+          if (!rdv.email || typeof rdv.email !== "string" || rdv.email.trim() === "") {
+            alert("❌ Vous devez renseigner l'email du cabinet avant de marquer cette installation comme effectuée.\n\nL'email est nécessaire pour l'envoi du contrat de service.\n\nVeuillez modifier le RDV et ajouter l'email.");
+            return;
+          }
     }
     
     try {
@@ -815,6 +830,20 @@ const InstallationsSuiviPage = ({ onRetour }) => {
 
   return (
     <div className="p-6">
+      {/* Formulaire simplifié - Prise de RDV uniquement */}
+      {showForm && (
+        <div className="bg-white border rounded-lg p-6 mb-6 shadow">
+          <h3 className="text-xl font-semibold mb-4">
+            {editingRdv ? "Modifier le rendez-vous" : "📅 Prise de rendez-vous"}
+          </h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Remplissez uniquement les informations nécessaires à la prise de rendez-vous. Les détails d'intervention seront complétés après.
+          </p>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* ...tous les champs du formulaire... */}
+          </form>
+        </div>
+      )}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Rendez-vous</h2>
         <div className="flex gap-2">
@@ -844,6 +873,8 @@ const InstallationsSuiviPage = ({ onRetour }) => {
           </button>
         </div>
       </div>
+
+      {/* La liste avancée est déjà affichée via le formulaire et le composant principal, on retire le doublon ici. */}
 
       {/* Import ICS Component */}
       {showImportICS && <ImportICS />}
@@ -1123,17 +1154,29 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                 disabled={
                   loading ||
                   ((form.type_rdv === 'Installation serveur' || form.type_rdv === 'Installation poste secondaire' || form.type_rdv === 'Changement de poste serveur') &&
-                    [form.email, form.adresse, form.code_postal, form.ville, form.praticiens].some(f => !f || f.trim() === ""))
+                    (!form.email || typeof form.email !== "string" || form.email.trim() === "" ||
+                     !form.adresse || typeof form.adresse !== "string" || form.adresse.trim() === "" ||
+                     !form.code_postal || typeof form.code_postal !== "string" || form.code_postal.trim() === "" ||
+                     !form.ville || typeof form.ville !== "string" || form.ville.trim() === "" ||
+                     !Array.isArray(form.praticiens) || form.praticiens.length === 0))
                 }
                 className={`bg-orange-500 text-white px-6 py-2 rounded hover:bg-orange-600 disabled:opacity-50 ${
                   (form.type_rdv === 'Installation serveur' || form.type_rdv === 'Installation poste secondaire' || form.type_rdv === 'Changement de poste serveur') &&
-                  [form.email, form.adresse, form.code_postal, form.ville, form.praticiens].some(f => !f || f.trim() === "") ? 'cursor-not-allowed' : ''
+                  (!form.email || typeof form.email !== "string" || form.email.trim() === "" ||
+                   !form.adresse || typeof form.adresse !== "string" || form.adresse.trim() === "" ||
+                   !form.code_postal || typeof form.code_postal !== "string" || form.code_postal.trim() === "" ||
+                   !form.ville || typeof form.ville !== "string" || form.ville.trim() === "" ||
+                   !Array.isArray(form.praticiens) || form.praticiens.length === 0) ? 'cursor-not-allowed' : ''
                 }`}
               >
                 {loading ? "⏳" : editingRdv ? "Modifier" : "Créer"}
               </button>
               {(form.type_rdv === 'Installation serveur' || form.type_rdv === 'Installation poste secondaire' || form.type_rdv === 'Changement de poste serveur') &&
-                [form.email, form.adresse, form.code_postal, form.ville, form.praticiens].some(f => !f || f.trim() === "") && (
+                (!form.email || typeof form.email !== "string" || form.email.trim() === "" ||
+                 !form.adresse || typeof form.adresse !== "string" || form.adresse.trim() === "" ||
+                 !form.code_postal || typeof form.code_postal !== "string" || form.code_postal.trim() === "" ||
+                 !form.ville || typeof form.ville !== "string" || form.ville.trim() === "" ||
+                 !Array.isArray(form.praticiens) || form.praticiens.length === 0) && (
                   <span className="text-red-500 text-sm mt-2">Veuillez remplir tous les champs obligatoires : Email, Adresse, Code Postal, Ville et Praticiens.</span>
               )}
               <button
