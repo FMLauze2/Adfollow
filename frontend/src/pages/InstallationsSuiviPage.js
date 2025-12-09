@@ -2,8 +2,37 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { getChecklistForType, getChecklistProgress } from "../utils/checklists";
 import ImportICS from "../components/ImportICS";
+// Modale InfosManquantesModal intégrée localement, pas d'import nécessaire
 
 const InstallationsSuiviPage = ({ onRetour }) => {
+    const [sortOption, setSortOption] = useState("date_desc");
+
+    const sortRdv = (rdvList) => {
+      const sorted = [...rdvList];
+      switch (sortOption) {
+        case "date_asc":
+          sorted.sort((a, b) => new Date(a.date_rdv) - new Date(b.date_rdv));
+          break;
+        case "date_desc":
+          sorted.sort((a, b) => new Date(b.date_rdv) - new Date(a.date_rdv));
+          break;
+        case "cabinet_az":
+          sorted.sort((a, b) => (a.cabinet || "").localeCompare(b.cabinet || ""));
+          break;
+        case "cabinet_za":
+          sorted.sort((a, b) => (b.cabinet || "").localeCompare(a.cabinet || ""));
+          break;
+        case "statut":
+          sorted.sort((a, b) => (a.statut || "").localeCompare(b.statut || ""));
+          break;
+        case "type":
+          sorted.sort((a, b) => (a.type_rdv || "").localeCompare(b.type_rdv || ""));
+          break;
+        default:
+          break;
+      }
+      return sorted;
+    };
   const [rendezvous, setRendezvous] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -57,6 +86,9 @@ const InstallationsSuiviPage = ({ onRetour }) => {
   const [autoArchiveDays, setAutoArchiveDays] = useState(90);
   const [currentPage, setCurrentPage] = useState(1);
   const rdvPerPage = 10;
+
+  // Nouvel état pour la modale infos manquantes
+  const [infosManquantesModal, setInfosManquantesModal] = useState({ open: false, rdv: null });
 
   useEffect(() => {
     fetchRendezvous();
@@ -177,6 +209,19 @@ const InstallationsSuiviPage = ({ onRetour }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Validation stricte uniquement pour les installations
+    const installationTypes = [
+      "Installation serveur",
+      "Installation poste secondaire",
+      "Changement de poste serveur"
+    ];
+    if (installationTypes.includes(form.type_rdv)) {
+      const requiredFields = [form.email, form.adresse, form.code_postal, form.ville, form.praticiens];
+      if (requiredFields.some(f => !f || (typeof f === "string" ? f.trim() === "" : Array.isArray(f) ? f.length === 0 : false))) {
+        alert("❌ Merci de remplir tous les champs obligatoires : Email, Adresse, Code Postal, Ville et Praticiens.");
+        return;
+      }
+    }
     setLoading(true);
     
     try {
@@ -384,24 +429,14 @@ const InstallationsSuiviPage = ({ onRetour }) => {
           return;
         }
         
-        // Proposer de créer un contrat si pas encore fait
+        // Remplace la logique de création de contrat dans handleFacturer
         if (!rdv.id_contrat) {
           const createContrat = window.confirm("⚠️ Aucun contrat de service n'a été créé pour cette installation.\n\nVoulez-vous créer un contrat avant de facturer ?");
           if (createContrat) {
             const prix = prompt("Entrez le prix du contrat (€):");
             if (prix && parseFloat(prix) > 0) {
-              try {
-                await axios.post(
-                  `http://localhost:4000/api/rendez-vous/${id}/create-contrat`,
-                  { prix: parseFloat(prix) }
-                );
-                alert("✓ Contrat créé avec succès !");
-                fetchRendezvous();
-              } catch (error) {
-                console.error("Erreur création contrat:", error);
-                alert(error.response?.data?.error || "Erreur lors de la création du contrat");
-                return;
-              }
+              await handleCreateContratWithCheck(rdv, prix);
+              return; // On arrête ici pour attendre la complétion
             } else {
               return; // Annuler la facturation si pas de prix valide
             }
@@ -748,12 +783,35 @@ const InstallationsSuiviPage = ({ onRetour }) => {
   };
 
   const filteredRdv = rendezvous.filter(rdv => {
-    const matchesSearch = rdv.cabinet.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         rdv.ville.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (rdv.cabinet ? rdv.cabinet.toLowerCase() : "").includes(searchTerm.toLowerCase()) ||
+               (rdv.ville ? rdv.ville.toLowerCase() : "").includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "Tous" || rdv.statut === statusFilter;
     const matchesType = typeFilter === "Tous" || rdv.type_rdv === typeFilter;
     return matchesSearch && matchesStatus && matchesType;
   });
+
+  // Nouvelle fonction pour vérifier et compléter les infos avant création de contrat
+  const handleCreateContratWithCheck = async (rdv, prix) => {
+    // Vérifie les champs obligatoires
+    const champs = ['adresse', 'code_postal', 'ville'];
+    const manquants = champs.filter(champ => !rdv[champ] || rdv[champ].trim() === '');
+    if (manquants.length > 0) {
+      setInfosManquantesModal({ open: true, rdv: { ...rdv, prix } });
+      return;
+    }
+    // Si tout est OK, crée le contrat
+    try {
+      await axios.post(
+        `http://localhost:4000/api/rendez-vous/${rdv.id_rdv}/create-contrat`,
+        { prix: parseFloat(prix), adresse: rdv.adresse, code_postal: rdv.code_postal, ville: rdv.ville }
+      );
+      alert('✓ Contrat créé avec succès !');
+      fetchRendezvous();
+    } catch (error) {
+      console.error('Erreur création contrat:', error);
+      alert(error.response?.data?.error || 'Erreur lors de la création du contrat');
+    }
+  };
 
   return (
     <div className="p-6">
@@ -780,7 +838,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
               setShowForm(!showForm);
               if (showImportICS) setShowImportICS(false);
             }}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+            className={`bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 font-semibold transition ${showForm ? 'bg-red-500 hover:bg-red-600' : ''}`}
           >
             {showForm ? "Annuler" : "+ Nouveau RDV"}
           </button>
@@ -923,147 +981,161 @@ const InstallationsSuiviPage = ({ onRetour }) => {
           </p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  {form.type_rdv === 'Autre' ? 'Nom du rendez-vous *' : 'Nom du cabinet *'}
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={form.cabinet}
+                  onChange={(e) => setForm({ ...form, cabinet: e.target.value })}
+                  className="w-full border px-3 py-2 rounded"
+                  placeholder={form.type_rdv === 'Autre' ? 'Nom du rendez-vous...' : 'Cabinet médical...'}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Type *</label>
+                <select
+                  required
+                  value={form.type_rdv}
+                  onChange={(e) => handleTypeChange(e.target.value)}
+                  className="w-full border px-3 py-2 rounded"
+                >
+                  <option value="Installation serveur">Installation serveur</option>
+                  <option value="Installation poste secondaire">Installation poste secondaire</option>
+                  <option value="Changement de poste serveur">Changement de poste serveur</option>
+                  <option value="Formation">Formation</option>
+                  <option value="Export BDD">Export BDD</option>
+                  <option value="Démo">Démo</option>
+                  <option value="Mise à jour">Mise à jour</option>
+                  <option value="Autre">Autre</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={form.date_rdv}
+                  onChange={(e) => setForm({ ...form, date_rdv: e.target.value })}
+                  className="w-full border px-3 py-2 rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Heure *</label>
+                <input
+                  type="time"
+                  required
+                  value={form.heure_rdv}
+                  onChange={(e) => setForm({ ...form, heure_rdv: e.target.value })}
+                  className="w-full border px-3 py-2 rounded"
+                />
+              </div>
+              {/* Champs dynamiques pour installation complète */}
+              {(form.type_rdv === 'Installation serveur' || form.type_rdv === 'Installation poste secondaire' || form.type_rdv === 'Changement de poste serveur') && <>
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    {form.type_rdv === 'Autre' ? 'Nom du rendez-vous *' : 'Nom du cabinet *'}
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={form.cabinet}
-                    onChange={(e) => setForm({ ...form, cabinet: e.target.value })}
-                    className="w-full border px-3 py-2 rounded"
-                    placeholder={form.type_rdv === 'Autre' ? 'Nom du rendez-vous...' : 'Cabinet médical...'}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Type *</label>
-                  <select
-                    required
-                    value={form.type_rdv}
-                    onChange={(e) => handleTypeChange(e.target.value)}
-                    className="w-full border px-3 py-2 rounded"
-                  >
-                    <option value="Installation serveur">Installation serveur</option>
-                    <option value="Installation poste secondaire">Installation poste secondaire</option>
-                    <option value="Changement de poste serveur">Changement de poste serveur</option>
-                    <option value="Formation">Formation</option>
-                    <option value="Export BDD">Export BDD</option>
-                    <option value="Démo">Démo</option>
-                    <option value="Mise à jour">Mise à jour</option>
-                    <option value="Autre">Autre</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={form.date_rdv}
-                    onChange={(e) => setForm({ ...form, date_rdv: e.target.value })}
-                    className="w-full border px-3 py-2 rounded"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Heure *</label>
-                  <input
-                    type="time"
-                    required
-                    value={form.heure_rdv}
-                    onChange={(e) => setForm({ ...form, heure_rdv: e.target.value })}
-                    className="w-full border px-3 py-2 rounded"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Téléphone <span className="text-gray-500 font-normal">(optionnel)</span></label>
-                  <input
-                    type="tel"
-                    value={form.telephone}
-                    onChange={(e) => setForm({ ...form, telephone: e.target.value })}
-                    className="w-full border px-3 py-2 rounded"
-                    placeholder="06 12 34 56 78"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Email <span className="text-gray-500 font-normal">(optionnel)</span></label>
+                  <label className="block text-sm font-medium mb-1">Email <span className="text-red-500 font-normal">*</span></label>
                   <input
                     type="email"
+                    required
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    className="w-full border px-3 py-2 rounded"
+                    className={`w-full border px-3 py-2 rounded ${form.email === '' ? 'border-red-500' : ''}`}
                     placeholder="contact@cabinet.fr"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-1">Adresse <span className="text-gray-500 font-normal">(optionnel)</span></label>
+                  <label className="block text-sm font-medium mb-1">Adresse <span className="text-red-500 font-normal">*</span></label>
                   <input
                     type="text"
+                    required
                     value={form.adresse}
                     onChange={(e) => setForm({ ...form, adresse: e.target.value })}
-                    className="w-full border px-3 py-2 rounded"
+                    className={`w-full border px-3 py-2 rounded ${form.adresse === '' ? 'border-red-500' : ''}`}
                     placeholder="12 rue de la Santé"
                   />
                 </div>
-                {form.type_rdv !== 'Autre' ? (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Code Postal <span className="text-gray-500 font-normal">(optionnel)</span></label>
-                      <input
-                        type="text"
-                        value={form.code_postal}
-                        onChange={async (e) => {
-                          const cp = e.target.value;
-                          setForm({ ...form, code_postal: cp });
-                          // Auto-complétion ville si CP valide (5 chiffres)
-                          if (cp.length === 5 && /^\d{5}$/.test(cp)) {
-                            try {
-                              const response = await fetch(`https://geo.api.gouv.fr/communes?codePostal=${cp}&fields=nom&format=json`);
-                              const data = await response.json();
-                              if (data && data.length > 0) {
-                                setForm(prev => ({ ...prev, ville: data[0].nom }));
-                              }
-                            } catch (error) {
-                              console.error("Erreur API Geo:", error);
-                            }
+                <div>
+                  <label className="block text-sm font-medium mb-1">Code Postal <span className="text-red-500 font-normal">*</span></label>
+                  <input
+                    type="text"
+                    required
+                    value={form.code_postal}
+                    onChange={async (e) => {
+                      const cp = e.target.value;
+                      setForm({ ...form, code_postal: cp });
+                      if (cp.length === 5 && /^\d{5}$/.test(cp)) {
+                        try {
+                          const response = await fetch(`https://geo.api.gouv.fr/communes?codePostal=${cp}&fields=nom&format=json`);
+                          const data = await response.json();
+                          if (data && data.length > 0) {
+                            setForm(prev => ({ ...prev, ville: data[0].nom }));
                           }
-                        }}
-                        className="w-full border px-3 py-2 rounded"
-                        placeholder="75001"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Ville <span className="text-gray-500 font-normal">(optionnel)</span></label>
-                      <input
-                        type="text"
-                        value={form.ville}
-                        onChange={(e) => setForm({ ...form, ville: e.target.value })}
-                        className="w-full border px-3 py-2 rounded"
-                        placeholder="Paris"
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium mb-1">Note</label>
-                    <textarea
-                      value={form.notes || ''}
-                      onChange={e => setForm({ ...form, notes: e.target.value })}
-                      className="w-full border px-3 py-2 rounded"
-                      placeholder="Ajouter une note ou description..."
-                      rows={2}
-                    />
-                  </div>
-                )}
+                        } catch (error) {
+                          console.error("Erreur API Geo:", error);
+                        }
+                      }
+                    }}
+                    className={`w-full border px-3 py-2 rounded ${form.code_postal === '' ? 'border-red-500' : ''}`}
+                    placeholder="75001"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Ville <span className="text-red-500 font-normal">*</span></label>
+                  <input
+                    type="text"
+                    required
+                    value={form.ville}
+                    onChange={(e) => setForm({ ...form, ville: e.target.value })}
+                    className={`w-full border px-3 py-2 rounded ${form.ville === '' ? 'border-red-500' : ''}`}
+                    placeholder="Paris"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium mb-1">Praticiens <span className="text-red-500 font-normal">*</span></label>
+                  <input
+                    type="text"
+                    required
+                    value={form.praticiens}
+                    onChange={e => setForm({ ...form, praticiens: e.target.value })}
+                    className={`w-full border px-3 py-2 rounded ${form.praticiens === '' ? 'border-red-500' : ''}`}
+                    placeholder="Dr Dupont, Dr Martin..."
+                  />
+                </div>
+              </>}
+              {/* Champ téléphone toujours présent */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Téléphone <span className="text-gray-500 font-normal">(optionnel)</span></label>
+                <input
+                  type="tel"
+                  value={form.telephone}
+                  onChange={(e) => setForm({ ...form, telephone: e.target.value })}
+                  className="w-full border px-3 py-2 rounded"
+                  placeholder="06 12 34 56 78"
+                />
               </div>
+            </div>
 
             <div className="flex gap-2">
               <button
                 type="submit"
-                disabled={loading}
-                className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600 disabled:opacity-50"
+                disabled={
+                  loading ||
+                  ((form.type_rdv === 'Installation serveur' || form.type_rdv === 'Installation poste secondaire' || form.type_rdv === 'Changement de poste serveur') &&
+                    [form.email, form.adresse, form.code_postal, form.ville, form.praticiens].some(f => !f || f.trim() === ""))
+                }
+                className={`bg-orange-500 text-white px-6 py-2 rounded hover:bg-orange-600 disabled:opacity-50 ${
+                  (form.type_rdv === 'Installation serveur' || form.type_rdv === 'Installation poste secondaire' || form.type_rdv === 'Changement de poste serveur') &&
+                  [form.email, form.adresse, form.code_postal, form.ville, form.praticiens].some(f => !f || f.trim() === "") ? 'cursor-not-allowed' : ''
+                }`}
               >
                 {loading ? "⏳" : editingRdv ? "Modifier" : "Créer"}
               </button>
+              {(form.type_rdv === 'Installation serveur' || form.type_rdv === 'Installation poste secondaire' || form.type_rdv === 'Changement de poste serveur') &&
+                [form.email, form.adresse, form.code_postal, form.ville, form.praticiens].some(f => !f || f.trim() === "") && (
+                  <span className="text-red-500 text-sm mt-2">Veuillez remplir tous les champs obligatoires : Email, Adresse, Code Postal, Ville et Praticiens.</span>
+              )}
               <button
                 type="button"
                 onClick={resetForm}
@@ -1071,15 +1143,6 @@ const InstallationsSuiviPage = ({ onRetour }) => {
               >
                 Annuler
               </button>
-              {!editingRdv && (
-                <button
-                  type="button"
-                  onClick={handleFillTestData}
-                  className="bg-purple-500 text-white px-6 py-2 rounded hover:bg-purple-600"
-                >
-                  🧪 Données test
-                </button>
-              )}
             </div>
           </form>
         </div>
@@ -1561,94 +1624,6 @@ const InstallationsSuiviPage = ({ onRetour }) => {
         </div>
       )}
 
-      {/* Modal Prévisualisation Texte GRC */}
-      {previewGrcModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold">Texte GRC - {previewGrcModal.cabinet}</h3>
-              <button
-                onClick={() => setPreviewGrcModal(null)}
-                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-2">
-                <label className="block text-sm font-medium">Texte à copier:</label>
-                <button
-                  onClick={copyPreviewGrcToClipboard}
-                  className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
-                >
-                  {copiedRdvId === previewGrcModal.id_rdv ? "✓ Copié !" : "📋 Copier"}
-                </button>
-              </div>
-              <textarea
-                value={previewGrcText}
-                readOnly
-                rows="15"
-                className="w-full border px-3 py-2 rounded bg-gray-50 font-mono text-sm"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setPreviewGrcModal(null)}
-                className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
-              >
-                Fermer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Prévisualisation Texte GRC */}
-      {previewGrcModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold">Texte GRC - {previewGrcModal.cabinet}</h3>
-              <button
-                onClick={() => setPreviewGrcModal(null)}
-                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-2">
-                <label className="block text-sm font-medium">Texte à copier:</label>
-                <button
-                  onClick={copyPreviewGrcToClipboard}
-                  className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
-                >
-                  {copiedRdvId === previewGrcModal.id_rdv ? "✓ Copié !" : "📋 Copier"}
-                </button>
-              </div>
-              <textarea
-                value={previewGrcText}
-                readOnly
-                rows="15"
-                className="w-full border px-3 py-2 rounded bg-gray-50 font-mono text-sm"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setPreviewGrcModal(null)}
-                className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
-              >
-                Fermer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Modal Checklist */}
       {checklistModalRdv && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -1665,109 +1640,104 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                 ×
               </button>
             </div>
-
-            {/* Barre de progression */}
-            <div className="mb-6">
-              <div className="flex justify-between text-sm mb-1">
-                <span className="font-semibold">Progression</span>
-                <span>{getChecklistProgress(currentChecklist)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                <div
-                  className="bg-teal-500 h-full rounded-full transition-all duration-300"
-                  style={{ width: `${getChecklistProgress(currentChecklist)}%` }}
-                ></div>
-              </div>
-            </div>
-
-            {/* Liste des tâches */}
-            <div className="space-y-2 mb-6">
-              {currentChecklist.map((item, index) => (
-                <label
-                  key={item.id}
-                  className={`flex items-start gap-3 p-3 rounded border-2 cursor-pointer transition ${
-                    item.checked 
-                      ? 'bg-teal-50 border-teal-300' 
-                      : 'bg-white border-gray-200 hover:border-gray-300'
-                  }`}
-                >
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    {form.type_rdv === 'Autre' ? 'Nom du rendez-vous *' : 'Nom du cabinet *'}
+                  </label>
                   <input
-                    type="checkbox"
-                    checked={item.checked || false}
-                    onChange={(e) => {
-                      const updated = [...currentChecklist];
-                      updated[index] = { ...updated[index], checked: e.target.checked };
-                      setCurrentChecklist(updated);
-                    }}
-                    className="mt-1 w-5 h-5 text-teal-500 rounded focus:ring-teal-500"
+                    type="text"
+                    required
+                    value={form.cabinet}
+                    onChange={(e) => setForm({ ...form, cabinet: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                    placeholder={form.type_rdv === 'Autre' ? 'Nom du rendez-vous...' : 'Cabinet médical...'}
                   />
-                  <span className={`flex-1 ${item.checked ? 'line-through text-gray-500' : 'text-gray-800'}`}>
-                    {item.label}
-                  </span>
-                </label>
-              ))}
-
-              {currentChecklist.length === 0 && (
-                <p className="text-gray-500 text-center py-8">Aucune checklist disponible pour ce type de RDV</p>
-              )}
-            </div>
-
-            {/* Boutons d'action */}
-            <div className="flex gap-2">
-              <button
-                onClick={async () => {
-                  try {
-                    // Sauvegarder la checklist dans les notes du RDV
-                    let existingNotes = {};
-                    try {
-                      existingNotes = JSON.parse(checklistModalRdv.notes || '{}');
-                    } catch {}
-
-                    const updatedNotes = {
-                      ...existingNotes,
-                      checklist: currentChecklist
-                    };
-
-                    await axios.put(`http://localhost:4000/api/rendez-vous/${checklistModalRdv.id_rdv}`, {
-                      ...checklistModalRdv,
-                      notes: JSON.stringify(updatedNotes)
-                    });
-
-                    alert("✓ Checklist sauvegardée !");
-                    setChecklistModalRdv(null);
-                    fetchRendezvous();
-                  } catch (error) {
-                    console.error("Erreur sauvegarde checklist:", error);
-                    alert("Erreur lors de la sauvegarde");
-                  }
-                }}
-                className="flex-1 bg-teal-500 text-white px-4 py-2 rounded hover:bg-teal-600 transition"
-              >
-                💾 Sauvegarder
-              </button>
-              <button
-                onClick={() => {
-                  const template = getChecklistForType(checklistModalRdv.type_rdv);
-                  setCurrentChecklist(template.map(item => ({ ...item, checked: false })));
-                }}
-                className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 transition"
-              >
-                ↺ Réinitialiser
-              </button>
-              <button
-                onClick={() => setChecklistModalRdv(null)}
-                className="bg-white text-red-600 px-4 py-2 rounded hover:bg-red-50 hover:text-red-700 border border-red-300 transition"
-              >
-                Fermer
-              </button>
-            </div>
-
-            {getChecklistProgress(currentChecklist) === 100 && (
-              <div className="mt-4 p-4 bg-green-50 border-2 border-green-300 rounded-lg text-center">
-                <span className="text-2xl">🎉</span>
-                <p className="font-semibold text-green-800">Checklist complétée !</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Type *</label>
+                  <select
+                    required
+                    value={form.type_rdv}
+                    onChange={(e) => handleTypeChange(e.target.value)}
+                    className="w-full border px-3 py-2 rounded"
+                  >
+                    <option value="Installation serveur">Installation serveur</option>
+                    <option value="Installation poste secondaire">Installation poste secondaire</option>
+                    <option value="Changement de poste serveur">Changement de poste serveur</option>
+                    <option value="Formation">Formation</option>
+                    <option value="Export BDD">Export BDD</option>
+                    <option value="Démo">Démo</option>
+                    <option value="Mise à jour">Mise à jour</option>
+                    <option value="Autre">Autre</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={form.date_rdv}
+                    onChange={(e) => setForm({ ...form, date_rdv: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Heure *</label>
+                  <input
+                    type="time"
+                    required
+                    value={form.heure_rdv}
+                    onChange={(e) => setForm({ ...form, heure_rdv: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                    placeholder="contact@cabinet.fr"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Adresse *</label>
+                  <input
+                    type="text"
+                    required
+                    value={form.adresse}
+                    onChange={(e) => setForm({ ...form, adresse: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                    placeholder="12 rue de la Santé"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Ville *</label>
+                  <input
+                    type="text"
+                    required
+                    value={form.ville}
+                    onChange={(e) => setForm({ ...form, ville: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                    placeholder="Paris"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium mb-1">Praticiens <span className="text-gray-500 font-normal">(optionnel)</span></label>
+                  <input
+                    type="text"
+                    value={form.praticiens || ''}
+                    onChange={(e) => setForm({ ...form, praticiens: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                    placeholder="Dr Dupont, Dr Martin..."
+                  />
+                </div>
               </div>
-            )}
+            </form>
           </div>
         </div>
       )}
@@ -2055,6 +2025,34 @@ const InstallationsSuiviPage = ({ onRetour }) => {
           </div>
         </div>
       )}
+
+      {/* Modal pour compléter les infos manquantes lors de la création de contrat */}
+      <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 ${showContratForm ? '' : 'hidden'}`}>
+        <div className="bg-white rounded-lg p-6 max-w-md w-full">
+          <h2 className="text-lg font-bold mb-4">Compléter les informations manquantes</h2>
+          <form onSubmit={e => {
+            e.preventDefault();
+            handleCreateContrat();
+          }} className="space-y-3">
+            <label className="block">
+              Adresse :
+              <input name="adresse" value={form.adresse} onChange={e => setForm({ ...form, adresse: e.target.value })} required className="border px-2 py-1 rounded w-full" />
+            </label>
+            <label className="block">
+              Code postal :
+              <input name="code_postal" value={form.code_postal} onChange={e => setForm({ ...form, code_postal: e.target.value })} required className="border px-2 py-1 rounded w-full" />
+            </label>
+            <label className="block">
+              Ville :
+              <input name="ville" value={form.ville} onChange={e => setForm({ ...form, ville: e.target.value })} required className="border px-2 py-1 rounded w-full" />
+            </label>
+            <div className="flex gap-2 mt-4">
+              <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded">Valider</button>
+              <button type="button" onClick={() => setShowContratForm(false)} className="bg-gray-300 px-4 py-2 rounded">Annuler</button>
+            </div>
+          </form>
+        </div>
+      </div>
 
       {/* Footer avec option archives */}
       <div className="mt-8 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg border-t-2 border-gray-300 dark:border-gray-700">
