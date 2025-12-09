@@ -335,7 +335,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
 
   const handleComplete = async (rdv) => {
     // Validation praticiens pour les installations
-    const typeNeedsPraticiens = ["Installation serveur", "Formation", "Démo", "Autre"];
+    const typeNeedsPraticiens = ["Installation serveur", "Formation", "Démo"];
     if (typeNeedsPraticiens.includes(rdv.type_rdv)) {
       if (!rdv.praticiens || rdv.praticiens.length === 0) {
         alert("❌ Vous devez renseigner au moins un praticien avant de marquer ce RDV comme effectué.\n\nVeuillez modifier le RDV et ajouter les praticiens.");
@@ -369,7 +369,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
     // Trouver le RDV pour validation
     const rdv = rendezvous.find(r => r.id_rdv === id);
     if (rdv) {
-      const typeNeedsPraticiens = ["Installation serveur", "Formation", "Démo", "Autre"];
+      const typeNeedsPraticiens = ["Installation serveur", "Formation", "Démo"];
       if (typeNeedsPraticiens.includes(rdv.type_rdv)) {
         if (!rdv.praticiens || rdv.praticiens.length === 0) {
           alert("❌ Vous devez renseigner au moins un praticien avant de facturer ce RDV.\n\nVeuillez modifier le RDV et ajouter les praticiens.");
@@ -924,14 +924,16 @@ const InstallationsSuiviPage = ({ onRetour }) => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Nom du cabinet *</label>
+                  <label className="block text-sm font-medium mb-1">
+                    {form.type_rdv === 'Autre' ? 'Nom du rendez-vous *' : 'Nom du cabinet *'}
+                  </label>
                   <input
                     type="text"
                     required
                     value={form.cabinet}
                     onChange={(e) => setForm({ ...form, cabinet: e.target.value })}
                     className="w-full border px-3 py-2 rounded"
-                    placeholder="Cabinet médical..."
+                    placeholder={form.type_rdv === 'Autre' ? 'Nom du rendez-vous...' : 'Cabinet médical...'}
                   />
                 </div>
                 <div>
@@ -1002,42 +1004,56 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                     placeholder="12 rue de la Santé"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Code Postal <span className="text-gray-500 font-normal">(optionnel)</span></label>
-                  <input
-                    type="text"
-                    value={form.code_postal}
-                    onChange={async (e) => {
-                      const cp = e.target.value;
-                      setForm({ ...form, code_postal: cp });
-                      
-                      // Auto-complétion ville si CP valide (5 chiffres)
-                      if (cp.length === 5 && /^\d{5}$/.test(cp)) {
-                        try {
-                          const response = await fetch(`https://geo.api.gouv.fr/communes?codePostal=${cp}&fields=nom&format=json`);
-                          const data = await response.json();
-                          if (data && data.length > 0) {
-                            setForm(prev => ({ ...prev, ville: data[0].nom }));
+                {form.type_rdv !== 'Autre' ? (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Code Postal <span className="text-gray-500 font-normal">(optionnel)</span></label>
+                      <input
+                        type="text"
+                        value={form.code_postal}
+                        onChange={async (e) => {
+                          const cp = e.target.value;
+                          setForm({ ...form, code_postal: cp });
+                          // Auto-complétion ville si CP valide (5 chiffres)
+                          if (cp.length === 5 && /^\d{5}$/.test(cp)) {
+                            try {
+                              const response = await fetch(`https://geo.api.gouv.fr/communes?codePostal=${cp}&fields=nom&format=json`);
+                              const data = await response.json();
+                              if (data && data.length > 0) {
+                                setForm(prev => ({ ...prev, ville: data[0].nom }));
+                              }
+                            } catch (error) {
+                              console.error("Erreur API Geo:", error);
+                            }
                           }
-                        } catch (error) {
-                          console.error("Erreur API Geo:", error);
-                        }
-                      }
-                    }}
-                    className="w-full border px-3 py-2 rounded"
-                    placeholder="75001"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Ville <span className="text-gray-500 font-normal">(optionnel)</span></label>
-                  <input
-                    type="text"
-                    value={form.ville}
-                    onChange={(e) => setForm({ ...form, ville: e.target.value })}
-                    className="w-full border px-3 py-2 rounded"
-                    placeholder="Paris"
-                  />
-                </div>
+                        }}
+                        className="w-full border px-3 py-2 rounded"
+                        placeholder="75001"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Ville <span className="text-gray-500 font-normal">(optionnel)</span></label>
+                      <input
+                        type="text"
+                        value={form.ville}
+                        onChange={(e) => setForm({ ...form, ville: e.target.value })}
+                        className="w-full border px-3 py-2 rounded"
+                        placeholder="Paris"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium mb-1">Note</label>
+                    <textarea
+                      value={form.notes || ''}
+                      onChange={e => setForm({ ...form, notes: e.target.value })}
+                      className="w-full border px-3 py-2 rounded"
+                      placeholder="Ajouter une note ou description..."
+                      rows={2}
+                    />
+                  </div>
+                )}
               </div>
 
             <div className="flex gap-2">

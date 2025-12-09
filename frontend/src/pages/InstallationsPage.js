@@ -53,7 +53,7 @@ const InstallationsPage = () => {
 
   const handleMarkEffectue = async (rdv) => {
     // Validation praticiens
-    const typeNeedsPraticiens = ["Installation serveur", "Formation", "Démo", "Autre"];
+    const typeNeedsPraticiens = ["Installation serveur", "Formation", "Démo"];
     if (typeNeedsPraticiens.includes(rdv.type_rdv)) {
       if (!rdv.praticiens || rdv.praticiens.length === 0) {
         alert("❌ Vous devez renseigner au moins un praticien.\n\nUtilisez la gestion avancée pour ajouter les praticiens.");
@@ -387,7 +387,7 @@ const InstallationsPage = () => {
               <form onSubmit={handleQuickAdd} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Cabinet <span className="text-red-500">*</span>
+                    {quickForm.type_rdv === 'Autre' ? 'Nom du rendez-vous *' : 'Nom du cabinet *'}
                   </label>
                   <input
                     type="text"
@@ -395,7 +395,7 @@ const InstallationsPage = () => {
                     onChange={(e) => setQuickForm({...quickForm, cabinet: e.target.value})}
                     required
                     className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                    placeholder="Nom du cabinet"
+                    placeholder={quickForm.type_rdv === 'Autre' ? 'Nom du rendez-vous...' : 'Nom du cabinet'}
                   />
                 </div>
 
@@ -448,35 +448,49 @@ const InstallationsPage = () => {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Ville <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={quickForm.ville}
-                      onChange={(e) => setQuickForm({...quickForm, ville: e.target.value})}
-                      required
-                      className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                      placeholder="Ville"
-                    />
+                {quickForm.type_rdv !== 'Autre' ? (
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {quickForm.type_rdv === 'Autre' ? 'Nom du rendez-vous *' : 'Nom du cabinet *'}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={quickForm.cabinet}
+                        onChange={e => setQuickForm({...quickForm, cabinet: e.target.value})}
+                        className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        placeholder={quickForm.type_rdv === 'Autre' ? 'Nom du rendez-vous...' : 'Cabinet médical...'}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Code postal
+                      </label>
+                      <input
+                        type="text"
+                        value={quickForm.code_postal}
+                        onChange={(e) => setQuickForm({...quickForm, code_postal: e.target.value})}
+                        className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        placeholder="75001"
+                        maxLength="5"
+                      />
+                    </div>
                   </div>
-
+                ) : (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Code postal
+                      Note
                     </label>
-                    <input
-                      type="text"
-                      value={quickForm.code_postal}
-                      onChange={(e) => setQuickForm({...quickForm, code_postal: e.target.value})}
+                    <textarea
+                      value={quickForm.notes || ''}
+                      onChange={e => setQuickForm({...quickForm, notes: e.target.value})}
                       className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                      placeholder="75001"
-                      maxLength="5"
+                      placeholder="Ajouter une note ou description..."
+                      rows={2}
                     />
                   </div>
-                </div>
+                )}
 
                 <div className="bg-blue-50 border border-blue-200 rounded p-3">
                   <p className="text-sm text-blue-800">
