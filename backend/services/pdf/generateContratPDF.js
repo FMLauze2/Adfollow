@@ -4,6 +4,15 @@ const puppeteer = require('puppeteer');
 
 // Génère un PDF de contrat moderne, full HTML/CSS
 async function generateContratPDF(contrat) {
+    // Lecture et encodage de l'entête en base64
+    let enteteBase64 = '';
+    try {
+      const entetePath = require('path').join(__dirname, 'templates', 'entete.png');
+      const enteteData = require('fs').readFileSync(entetePath);
+      enteteBase64 = `data:image/png;base64,${enteteData.toString('base64')}`;
+    } catch (e) {
+      enteteBase64 = '';
+    }
   // Formatage des dates
   const dateDebut = new Date(contrat.date_debut || contrat.date_envoi || new Date());
   const dateFin = new Date(dateDebut);
@@ -89,6 +98,16 @@ Si l'une des parties manque à ses obligations au titre des présentes, l'autre 
     signatureBase64 = '';
   }
 
+  // Lecture et encodage du pied de page en base64
+  let piedBase64 = '';
+  try {
+    const piedPath = require('path').join(__dirname, 'templates', 'pieddepage.png');
+    const piedData = require('fs').readFileSync(piedPath);
+    piedBase64 = `data:image/png;base64,${piedData.toString('base64')}`;
+  } catch (e) {
+    piedBase64 = '';
+  }
+
   const htmlContent = `<!DOCTYPE html>
     <html lang="fr">
     <head>
@@ -97,8 +116,25 @@ Si l'une des parties manque à ses obligations au titre des présentes, l'autre 
       <style>
         html, body { height: 100%; margin: 0; padding: 0; }
         body { font-family: 'Segoe UI', Arial, sans-serif; background: #f8fafc; color: #222; margin: 0; min-height: 100vh; display: flex; flex-direction: column; }
-        .container { max-width: 900px; min-height: 97vh; height: 97vh; display: flex; flex-direction: column; justify-content: flex-start; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 12px #0001; padding: 18px 24px 8px 24px; box-sizing: border-box; }
-        .main-title { color: #2563eb; font-size: 2em; font-weight: 700; text-align: center; margin-bottom: 0; }
+        .container { max-width: 900px; min-height: 90vh; height: 90vh; display: flex; flex-direction: column; justify-content: flex-start; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 12px #0001; padding: 10px 16px 4px 16px; box-sizing: border-box; }
+        .main-title {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #2563eb;
+          font-size: 2em;
+          font-weight: 700;
+          text-align: center;
+          margin-bottom: 0;
+          gap: 18px;
+        }
+        .entete-img {
+          max-height: 60px;
+          max-width: 180px;
+          height: auto;
+          width: auto;
+          display: block;
+        }
         .subtitle { text-align: center; color: #2563eb; font-size: 1em; margin-bottom: 6px; }
         .divider { border: none; border-top: 3px solid #2563eb; margin: 12px 0 18px 0; }
         .section-title { color: #2563eb; font-size: 1em; font-weight: 700; margin-top: 18px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
@@ -119,8 +155,8 @@ Si l'une des parties manque à ses obligations au titre des présentes, l'autre 
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
-          margin-top: 60px;
-          min-height: 120px;
+          margin-top: 30px;
+          min-height: 80px;
           position: relative;
         }
         .signature-block {
@@ -139,13 +175,23 @@ Si l'une des parties manque à ses obligations au titre des présentes, l'autre 
           height: 38px;
         }
         .sion-sign { margin-top: 4px; }
+        .pieddepage-img {
+          display: block;
+          margin: 12px auto 0 auto;
+          max-width: 80%;
+          max-height: 50px;
+        }
         .page-break { page-break-before: always; break-before: page; }
         .legal { background: #f0f4ff; border-left: 4px solid #2563eb; padding: 12px 16px; border-radius: 8px; margin-top: 18px; font-size: 0.95em; color: #222; }
       </style>
     </head>
     <body>
       <div class="container">
-        <div class="main-title">Contrat de services — A.D.SION INFO SANTÉ - Méd'OC</div>
+        
+        <div class="main-title">
+          <span>Contrat de services</span>
+          ${enteteBase64 ? `<img src="${enteteBase64}" alt="En-tête" class="entete-img" />` : ''}
+        </div>
         <div class="subtitle">SERVICES : Assistance logiciel Med’Oc</div>
         <hr class="divider" />
         <div class="section-title">Informations Cabinet</div>
@@ -192,6 +238,7 @@ Si l'une des parties manque à ses obligations au titre des présentes, l'autre 
           </div>
         </div>
       </div>
+      ${piedBase64 ? `<img src="${piedBase64}" alt="Pied de page" class="pieddepage-img" />` : ''}
       <div class="page-break"></div>
       <div class="container">
         <div class="section-title">Mentions légales</div>
