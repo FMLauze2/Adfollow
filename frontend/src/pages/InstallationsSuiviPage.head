@@ -1,18 +1,60 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
+import axios from "axios";
+import { getChecklistForType, getChecklistProgress } from "../utils/checklists";
 import ImportICS from "../components/ImportICS";
-import api from "../api/Api";
-import { showError, showSuccess } from "../utils/toast";
-import { getChecklistForType } from "../utils/checklists";
-import { getCachedRdv, setCachedRdv } from "../services/rdvCache";
+import RechercheAvanceeRDV from "../components/RechercheAvanceeRDV";
+// Modale InfosManquantesModal int├®gr├®e localement, pas d'import n├®cessaire
 
 const InstallationsSuiviPage = ({ onRetour }) => {
+    const location = useLocation();
+    const [sortOption, setSortOption] = useState("date_desc");
+    const [showForm, setShowForm] = useState(false);
+    // ...existing code...
+
+    // Scroll automatique en haut d├¿s que le formulaire s'affiche
+    useEffect(() => {
+      if (showForm) {
+        setTimeout(() => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 100);
+      }
+    }, [showForm]);
+
+    const sortRdv = (rdvList) => {
+      const sorted = [...rdvList];
+      switch (sortOption) {
+        case "date_asc":
+          sorted.sort((a, b) => new Date(a.date_rdv) - new Date(b.date_rdv));
+          break;
+        case "date_desc":
+          sorted.sort((a, b) => new Date(b.date_rdv) - new Date(a.date_rdv));
+          break;
+        case "cabinet_az":
+          sorted.sort((a, b) => (a.cabinet || "").localeCompare(b.cabinet || ""));
+          break;
+        case "cabinet_za":
+          sorted.sort((a, b) => (b.cabinet || "").localeCompare(a.cabinet || ""));
+          break;
+        case "statut":
+          sorted.sort((a, b) => (a.statut || "").localeCompare(b.statut || ""));
+          break;
+        case "type":
+          sorted.sort((a, b) => (a.type_rdv || "").localeCompare(b.type_rdv || ""));
+          break;
+        default:
+          break;
+      }
+      return sorted;
+    };
   const [rendezvous, setRendezvous] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("Tous");
   const [typeFilter, setTypeFilter] = useState("Tous");
   const [cabinetHistoryModal, setCabinetHistoryModal] = useState(null);
-  const [showForm, setShowForm] = useState(false);
+  
+  // Form state
   const [form, setForm] = useState({
     cabinet: "",
     date_rdv: "",
@@ -26,15 +68,20 @@ const InstallationsSuiviPage = ({ onRetour }) => {
     praticiens: [],
     notes: ""
   });
+  
+  // Champs sp├®cifiques par type de RDV
   const [specificFields, setSpecificFields] = useState({});
+  
   const [praticienForm, setPraticienForm] = useState({ nom: "", prenom: "" });
+  
+  // Modal ├®tats
   const [editingRdv, setEditingRdv] = useState(null);
   const [completeModalRdv, setCompleteModalRdv] = useState(null);
   const [treatmentModalRdv, setTreatmentModalRdv] = useState(null);
   const [treatmentForm, setTreatmentForm] = useState({
     specificFields: {},
     praticiens: [],
-    notes: "",
+    notes: '',
     checklist: []
   });
   const [grcText, setGrcText] = useState("");
@@ -43,81 +90,77 @@ const InstallationsSuiviPage = ({ onRetour }) => {
   const [showContratForm, setShowContratForm] = useState(false);
   const [contratPrix, setContratPrix] = useState("");
   const [creatingContrat, setCreatingContrat] = useState(false);
+  const [checklistModalRdv, setChecklistModalRdv] = useState(null);
+  const [currentChecklist, setCurrentChecklist] = useState([]);
   const [showImportICS, setShowImportICS] = useState(false);
   const [previewGrcModal, setPreviewGrcModal] = useState(null);
   const [previewGrcText, setPreviewGrcText] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const [autoArchiveDays, setAutoArchiveDays] = useState(90);
   const [currentPage, setCurrentPage] = useState(1);
   const rdvPerPage = 10;
+
+  // Nouvel ├®tat pour la modale infos manquantes
   const [infosManquantesModal, setInfosManquantesModal] = useState({ open: false, rdv: null });
-
-  const fetchRendezvous = async (force = false) => {
-    setLoading(true);
-    try {
-      const cacheKey = showArchived ? "rdv_suivi_archived" : "rdv_suivi_active";
-
-      if (!force) {
-        const cached = getCachedRdv(cacheKey);
-        if (cached) {
-          setRendezvous(cached);
-          setLoading(false);
-          return;
-        }
-      }
-
-      const url = showArchived ? "/rendez-vous?includeArchived=true" : "/rendez-vous";
-      const response = await api.get(url);
-      const data = response.data || [];
-      setCachedRdv(cacheKey, data);
-      setRendezvous(data);
-    } catch (error) {
-      console.error("Erreur chargement RDV:", error);
-      showError("Erreur lors du chargement des rendez-vous");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
     fetchRendezvous();
   }, [showArchived]);
 
+  // G├®rer l'ouverture du formulaire de modification depuis la navigation
+  useEffect(() => {
+    if (location.state?.editRdv) {
+      const rdv = location.state.editRdv;
+      handleEdit(rdv);
+      // Nettoyer le state pour ├®viter de rouvrir ├á chaque render
+      window.history.replaceState({}, '');
+    }
+  }, [location.state]);
+
+  // G├®rer l'ouverture du modal depuis le calendrier
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const traiterRdvId = urlParams.get("traiter");
-
+    const traiterRdvId = urlParams.get('traiter');
+    
     if (traiterRdvId && rendezvous.length > 0) {
-      const rdv = rendezvous.find((r) => r.id_rdv === parseInt(traiterRdvId, 10));
+      const rdv = rendezvous.find(r => r.id_rdv === parseInt(traiterRdvId));
       if (rdv) {
         setTreatmentModalRdv(rdv);
-        window.history.replaceState({}, "", "/installations");
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        // Nettoyer l'URL
+        window.history.replaceState({}, '', '/installations');
+        // Scroll vers le haut
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     }
   }, [rendezvous]);
 
+  // R├®initialiser la page ├á 1 quand les filtres changent
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter, typeFilter, showArchived]);
 
+  // Initialiser le formulaire de traitement quand le modal s'ouvre
   useEffect(() => {
     if (treatmentModalRdv) {
       let parsedSpecificFields = {};
-      let parsedNotes = "";
+      let parsedNotes = '';
       let savedChecklist = [];
-
+      
       try {
-        const notesData = JSON.parse(treatmentModalRdv.notes || "{}");
+        const notesData = JSON.parse(treatmentModalRdv.notes || '{}');
         parsedSpecificFields = notesData.specificFields || {};
-        parsedNotes = notesData.generalNotes || "";
+        parsedNotes = notesData.generalNotes || '';
         savedChecklist = notesData.checklist || [];
       } catch {
-        parsedNotes = treatmentModalRdv.notes || "";
+        parsedNotes = treatmentModalRdv.notes || '';
       }
-
+      
+      // Charger la checklist pour ce type de RDV
       const baseChecklist = getChecklistForType(treatmentModalRdv.type_rdv);
+      
+      // Si une checklist a ├®t├® sauvegard├®e, l'utiliser, sinon utiliser la checklist de base
       const checklist = savedChecklist.length > 0 ? savedChecklist : baseChecklist;
-
+      
       setTreatmentForm({
         specificFields: parsedSpecificFields,
         praticiens: treatmentModalRdv.praticiens || [],
@@ -127,27 +170,43 @@ const InstallationsSuiviPage = ({ onRetour }) => {
     }
   }, [treatmentModalRdv]);
 
+  const fetchRendezvous = async () => {
+    setLoading(true);
+    try {
+      const url = showArchived 
+        ? "http://localhost:4000/api/rendez-vous?includeArchived=true"
+        : "http://localhost:4000/api/rendez-vous";
+      const response = await axios.get(url);
+      setRendezvous(response.data || []);
+    } catch (error) {
+      console.error("Erreur chargement RDV:", error);
+      alert("Erreur lors du chargement des rendez-vous");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleArchiveRdv = async (idRdv) => {
-    if (!window.confirm("Archiver ce rendez-vous ? Il sera masqué de la vue principale.")) return;
+    if (!window.confirm("Archiver ce rendez-vous ? Il sera masqu├® de la vue principale.")) return;
     
     try {
-      await api.post(`/rendez-vous/archive/${idRdv}`);
-      showSuccess("RDV archivé");
-      fetchRendezvous(true);
+      await axios.post(`http://localhost:4000/api/rendez-vous/archive/${idRdv}`);
+      alert("RDV archiv├® !");
+      fetchRendezvous();
     } catch (error) {
       console.error("Erreur archivage:", error);
-      showError("Erreur lors de l'archivage");
+      alert("Erreur lors de l'archivage");
     }
   };
 
   const handleUnarchiveRdv = async (idRdv) => {
     try {
-      await api.post(`/rendez-vous/unarchive/${idRdv}`);
-      showSuccess("RDV restauré");
-      fetchRendezvous(true);
+      await axios.post(`http://localhost:4000/api/rendez-vous/unarchive/${idRdv}`);
+      alert("RDV restaur├® !");
+      fetchRendezvous();
     } catch (error) {
-      console.error("Erreur désarchivage:", error);
-      showError("Erreur lors de la restauration");
+      console.error("Erreur d├®sarchivage:", error);
+      alert("Erreur lors de la restauration");
     }
   };
 
@@ -156,18 +215,18 @@ const InstallationsSuiviPage = ({ onRetour }) => {
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const monthName = firstDayOfMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
     
-    const confirmMsg = `Archiver automatiquement tous les RDV effectués et facturés avant ${monthName} ?\n\n` +
-                       `(Les installations complètes sans contrat de service seront préservées)`;
+    const confirmMsg = `Archiver automatiquement tous les RDV effectu├®s et factur├®s avant ${monthName} ?\n\n` +
+                       `(Les installations compl├¿tes sans contrat de service seront pr├®serv├®es)`;
     if (!window.confirm(confirmMsg)) return;
     
     try {
-      const response = await api.post("/rendez-vous/auto-archive");
+      const response = await axios.post("http://localhost:4000/api/rendez-vous/auto-archive");
       
-      showSuccess(`${response.data.archived} RDV archivé(s)`);
-      fetchRendezvous(true);
+      alert(`Ô£à ${response.data.archived} RDV archiv├®(s) !`);
+      fetchRendezvous();
     } catch (error) {
       console.error("Erreur auto-archivage:", error);
-      showError("Erreur lors de l'archivage automatique");
+      alert("Erreur lors de l'archivage automatique");
     }
   };
 
@@ -180,26 +239,26 @@ const InstallationsSuiviPage = ({ onRetour }) => {
       "Changement de poste serveur"
     ];
         if (installationTypes.includes(form.type_rdv)) {
-          // Validation stricte : tous les champs string doivent être non vides, praticiens doit être un array non vide
+          // Validation stricte : tous les champs string doivent ├¬tre non vides, praticiens doit ├¬tre un array non vide
           if (!form.email || typeof form.email !== "string" || form.email.trim() === "" ||
               !form.adresse || typeof form.adresse !== "string" || form.adresse.trim() === "" ||
               !form.code_postal || typeof form.code_postal !== "string" || form.code_postal.trim() === "" ||
               !form.ville || typeof form.ville !== "string" || form.ville.trim() === "" ||
               !Array.isArray(form.praticiens) || form.praticiens.length === 0) {
-            showError("Merci de remplir Email, Adresse, Code Postal, Ville et Praticiens.");
+            alert("ÔØî Merci de remplir tous les champs obligatoires : Email, Adresse, Code Postal, Ville et Praticiens.");
             return;
           }
     }
     setLoading(true);
     
     try {
-      // Construire les notes avec champs spécifiques en JSON
+      // Construire les notes avec champs sp├®cifiques en JSON
       const notesData = {
         specificFields: specificFields || {},
         generalNotes: form.notes || ""
       };
       
-      // Préparer les données avec date au format ISO sans timezone
+      // Pr├®parer les donn├®es avec date au format ISO sans timezone
       const submitData = {
         ...form,
         date_rdv: form.date_rdv, // Garder le format YYYY-MM-DD simple
@@ -208,18 +267,18 @@ const InstallationsSuiviPage = ({ onRetour }) => {
       };
       
       if (editingRdv) {
-        await api.put(`/rendez-vous/${editingRdv.id_rdv}`, submitData);
-        showSuccess("Rendez-vous modifié");
+        await axios.put(`http://localhost:4000/api/rendez-vous/${editingRdv.id_rdv}`, submitData);
+        alert("Rendez-vous modifi├® !");
       } else {
-        await api.post("/rendez-vous", submitData);
-        showSuccess("Rendez-vous créé");
+        await axios.post("http://localhost:4000/api/rendez-vous", submitData);
+        alert("Rendez-vous cr├®├® !");
       }
       
       resetForm();
-      fetchRendezvous(true);
+      fetchRendezvous();
     } catch (error) {
       console.error("Erreur:", error);
-      showError("Erreur lors de l'enregistrement");
+      alert("Erreur lors de l'enregistrement");
     } finally {
       setLoading(false);
     }
@@ -261,14 +320,14 @@ const InstallationsSuiviPage = ({ onRetour }) => {
         { nom: "Dupont", prenom: "Jean" },
         { nom: "Martin", prenom: "Sophie" }
       ],
-      notes: prev.notes || "Installation complète avec formation des praticiens"
+      notes: prev.notes || "Installation compl├¿te avec formation des praticiens"
     }));
   };
 
   const handleEdit = (rdv) => {
     setEditingRdv(rdv);
     
-    // Parser les notes pour extraire les champs spécifiques
+    // Parser les notes pour extraire les champs sp├®cifiques
     let parsedNotes = "";
     let parsedSpecificFields = {};
     try {
@@ -314,7 +373,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
       parsedNotes = rdv.notes || '';
     }
     
-    setEditingRdv(null); // Pas d'édition, c'est une création
+    setEditingRdv(null); // Pas d'├®dition, c'est une cr├®ation
     setForm({
       cabinet: rdv.cabinet,
       date_rdv: '', // Laisser vide pour nouvelle date
@@ -333,37 +392,25 @@ const InstallationsSuiviPage = ({ onRetour }) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Convertit une chaîne "Prenom Nom, Autre" en tableau d'objets {prenom, nom}
-  const parsePraticiensInput = (value) => {
-    return value
-      .split(',')
-      .map(part => part.trim())
-      .filter(Boolean)
-      .map(part => {
-        const [prenom, ...rest] = part.split(' ');
-        return { prenom: prenom || '', nom: rest.join(' ') || '' };
-      });
-  };
-
   const handleDelete = async (id) => {
     if (!window.confirm("Supprimer ce rendez-vous ?")) return;
     
     try {
-      await api.delete(`/rendez-vous/${id}`);
-      showSuccess("Rendez-vous supprimé");
-      fetchRendezvous(true);
+      await axios.delete(`http://localhost:4000/api/rendez-vous/${id}`);
+      alert("Rendez-vous supprim├®");
+      fetchRendezvous();
     } catch (error) {
       console.error("Erreur suppression:", error);
-      showError("Erreur lors de la suppression");
+      alert("Erreur lors de la suppression");
     }
   };
 
   const handleComplete = async (rdv) => {
     // Validation praticiens pour les installations
-    const typeNeedsPraticiens = ["Installation serveur", "Formation", "Démo"];
+    const typeNeedsPraticiens = ["Installation serveur", "Formation", "D├®mo"];
         if (typeNeedsPraticiens.includes(rdv.type_rdv)) {
           if (!Array.isArray(rdv.praticiens) || rdv.praticiens.length === 0) {
-            showError("Ajoutez au moins un praticien avant de marquer comme effectué.");
+            alert("ÔØî Vous devez renseigner au moins un praticien avant de marquer ce RDV comme effectu├®.\n\nVeuillez modifier le RDV et ajouter les praticiens.");
             return;
           }
         }
@@ -371,23 +418,22 @@ const InstallationsSuiviPage = ({ onRetour }) => {
         // Validation email obligatoire pour Installation serveur
         if (rdv.type_rdv === "Installation serveur") {
           if (!rdv.email || typeof rdv.email !== "string" || rdv.email.trim() === "") {
-            showError("Renseignez l'email du cabinet avant de marquer comme effectué.");
+            alert("ÔØî Vous devez renseigner l'email du cabinet avant de marquer cette installation comme effectu├®e.\n\nL'email est n├®cessaire pour l'envoi du contrat de service.\n\nVeuillez modifier le RDV et ajouter l'email.");
             return;
           }
     }
     
     try {
-      const response = await api.post(`/rendez-vous/${rdv.id_rdv}/complete`);
+      const response = await axios.post(`http://localhost:4000/api/rendez-vous/${rdv.id_rdv}/complete`);
       setGrcText(response.data.grcText);
       setCompleteModalRdv(rdv);
       setCopiedGrc(false);
       setShowContratForm(false);
       setContratPrix("");
-      showSuccess("RDV marqué comme effectué");
-      fetchRendezvous(true);
+      fetchRendezvous();
     } catch (error) {
-      console.error("Erreur marquage effectué:", error);
-      showError("Erreur lors du marquage comme effectué");
+      console.error("Erreur marquage effectu├®:", error);
+      alert("Erreur lors du marquage comme effectu├®");
     }
   };
 
@@ -395,10 +441,10 @@ const InstallationsSuiviPage = ({ onRetour }) => {
     // Trouver le RDV pour validation
     const rdv = rendezvous.find(r => r.id_rdv === id);
     if (rdv) {
-      const typeNeedsPraticiens = ["Installation serveur", "Formation", "Démo"];
+      const typeNeedsPraticiens = ["Installation serveur", "Formation", "D├®mo"];
       if (typeNeedsPraticiens.includes(rdv.type_rdv)) {
         if (!rdv.praticiens || rdv.praticiens.length === 0) {
-          showError("Ajoutez au moins un praticien avant de facturer.");
+          alert("ÔØî Vous devez renseigner au moins un praticien avant de facturer ce RDV.\n\nVeuillez modifier le RDV et ajouter les praticiens.");
           return;
         }
       }
@@ -406,18 +452,18 @@ const InstallationsSuiviPage = ({ onRetour }) => {
       // Validation email obligatoire pour Installation serveur
       if (rdv.type_rdv === "Installation serveur") {
         if (!rdv.email || rdv.email.trim() === "") {
-          showError("Renseignez l'email du cabinet avant de facturer.");
+          alert("ÔØî Vous devez renseigner l'email du cabinet avant de facturer cette installation.\n\nL'email est n├®cessaire pour l'envoi du contrat de service.\n\nVeuillez modifier le RDV et ajouter l'email.");
           return;
         }
         
-        // Remplace la logique de création de contrat dans handleFacturer
+        // Remplace la logique de cr├®ation de contrat dans handleFacturer
         if (!rdv.id_contrat) {
-          const createContrat = window.confirm("⚠️ Aucun contrat de service n'a été créé pour cette installation.\n\nVoulez-vous créer un contrat avant de facturer ?");
+          const createContrat = window.confirm("ÔÜá´©Å Aucun contrat de service n'a ├®t├® cr├®├® pour cette installation.\n\nVoulez-vous cr├®er un contrat avant de facturer ?");
           if (createContrat) {
-            const prix = prompt("Entrez le prix du contrat (€):");
+            const prix = prompt("Entrez le prix du contrat (Ôé¼):");
             if (prix && parseFloat(prix) > 0) {
               await handleCreateContratWithCheck(rdv, prix);
-              return; // On arrête ici pour attendre la complétion
+              return; // On arr├¬te ici pour attendre la compl├®tion
             } else {
               return; // Annuler la facturation si pas de prix valide
             }
@@ -426,75 +472,75 @@ const InstallationsSuiviPage = ({ onRetour }) => {
       }
     }
     
-    if (!window.confirm("Marquer ce rendez-vous comme facturé ?")) return;
+    if (!window.confirm("Marquer ce rendez-vous comme factur├® ?")) return;
     
     try {
-      await api.post(`/rendez-vous/${id}/facturer`);
-      showSuccess("Rendez-vous marqué comme facturé");
-      fetchRendezvous(true);
+      await axios.post(`http://localhost:4000/api/rendez-vous/${id}/facturer`);
+      alert("Rendez-vous marqu├® comme factur├® !");
+      fetchRendezvous();
     } catch (error) {
-      console.error("Erreur marquage facturé:", error);
-      showError("Erreur lors du marquage comme facturé");
+      console.error("Erreur marquage factur├®:", error);
+      alert("Erreur lors du marquage comme factur├®");
     }
   };
 
   const handleReplanifier = async (id) => {
-    if (!window.confirm("Remettre ce rendez-vous à l'état 'Planifié' ?")) return;
+    if (!window.confirm("Remettre ce rendez-vous ├á l'├®tat 'Planifi├®' ?")) return;
     
     try {
-      await api.post(`/rendez-vous/${id}/replanifier`);
-      showSuccess("Rendez-vous remis à l'état Planifié");
-      fetchRendezvous(true);
+      await axios.post(`http://localhost:4000/api/rendez-vous/${id}/replanifier`);
+      alert("Rendez-vous remis ├á l'├®tat Planifi├® !");
+      fetchRendezvous();
     } catch (error) {
       console.error("Erreur replanification:", error);
-      showError("Erreur lors de la replanification");
+      alert("Erreur lors de la replanification");
     }
   };
 
   const handleCreateContrat = async () => {
     if (!contratPrix || parseFloat(contratPrix) <= 0) {
-      showError("Veuillez entrer un prix valide");
+      alert("Veuillez entrer un prix valide");
       return;
     }
     
     setCreatingContrat(true);
     try {
-      await api.post(
-        `/rendez-vous/${completeModalRdv.id_rdv}/create-contrat`,
+      await axios.post(
+        `http://localhost:4000/api/rendez-vous/${completeModalRdv.id_rdv}/create-contrat`,
         { prix: parseFloat(contratPrix) }
       );
-      showSuccess("Contrat créé et lié au rendez-vous");
+      alert("Contrat cr├®├® et li├® au rendez-vous !");
       setCompleteModalRdv(null);
       setShowContratForm(false);
       setContratPrix("");
-      fetchRendezvous(true);
+      fetchRendezvous();
     } catch (error) {
-      console.error("Erreur création contrat:", error);
-      showError(error.response?.data?.error || "Erreur lors de la création du contrat");
+      console.error("Erreur cr├®ation contrat:", error);
+      alert(error.response?.data?.error || "Erreur lors de la cr├®ation du contrat");
     } finally {
       setCreatingContrat(false);
     }
   };
 
   const handleRegenerateContrat = async (rdv) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir régénérer le contrat ?\n\nCela va recréer le PDF avec les informations actuelles du RDV.")) return;
+    if (!window.confirm("├ètes-vous s├╗r de vouloir r├®g├®n├®rer le contrat ?\n\nCela va recr├®er le PDF avec les informations actuelles du RDV.")) return;
     
     try {
-      await api.post(
-        `/rendez-vous/${rdv.id_rdv}/regenerate-contrat`
+      const response = await axios.post(
+        `http://localhost:4000/api/rendez-vous/${rdv.id_rdv}/regenerate-contrat`
       );
-      showSuccess("Contrat régénéré");
-      fetchRendezvous(true);
+      alert("Ô£ô Contrat r├®g├®n├®r├® avec succ├¿s !");
+      fetchRendezvous();
     } catch (error) {
-      console.error("Erreur régénération contrat:", error);
-      showError(error.response?.data?.error || "Erreur lors de la régénération du contrat");
+      console.error("Erreur r├®g├®n├®ration contrat:", error);
+      alert(error.response?.data?.error || "Erreur lors de la r├®g├®n├®ration du contrat");
     }
   };
 
   const downloadICS = async (rdv) => {
     try {
-      const response = await api.get(
-        `/rendez-vous/${rdv.id_rdv}/ics`,
+      const response = await axios.get(
+        `http://localhost:4000/api/rendez-vous/${rdv.id_rdv}/ics`,
         { responseType: 'blob' }
       );
       
@@ -506,8 +552,8 @@ const InstallationsSuiviPage = ({ onRetour }) => {
       link.click();
       link.remove();
     } catch (error) {
-      console.error("Erreur téléchargement ICS:", error);
-      showError("Erreur lors du téléchargement du fichier");
+      console.error("Erreur t├®l├®chargement ICS:", error);
+      alert("Erreur lors du t├®l├®chargement du fichier");
     }
   };
 
@@ -529,12 +575,12 @@ const InstallationsSuiviPage = ({ onRetour }) => {
     const generalNotes = notesData.generalNotes || rdv.notes || '';
     const checklist = notesData.checklist || [];
 
-    let text = `RDV du ${rdv.date_rdv.split('T')[0].split('-').reverse().join('/')} à ${rdv.heure_rdv}\n`;
+    let text = `RDV du ${rdv.date_rdv.split('T')[0].split('-').reverse().join('/')} ├á ${rdv.heure_rdv}\n`;
     text += `Cabinet: ${rdv.cabinet}\n`;
     text += `Type: ${rdv.type_rdv}\n`;
     text += `Adresse: ${rdv.adresse}, ${rdv.code_postal} ${rdv.ville}\n\n`;
 
-    // Parser les praticiens si nécessaire (peut être une string JSON)
+    // Parser les praticiens si n├®cessaire (peut ├¬tre une string JSON)
     let praticiens = rdv.praticiens;
     if (typeof praticiens === 'string') {
       try {
@@ -557,7 +603,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
     }
 
     if (Object.keys(specificFields).length > 0) {
-      text += `Détails techniques:\n`;
+      text += `D├®tails techniques:\n`;
       for (const [key, value] of Object.entries(specificFields)) {
         if (value) {
           const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -571,7 +617,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
     if (checklist.length > 0) {
       text += `Checklist d'intervention:\n`;
       checklist.forEach(item => {
-        const status = item.checked ? '✓' : '☐';
+        const status = item.checked ? 'Ô£ô' : 'ÔÿÉ';
         text += `${status} ${item.label}\n`;
       });
       text += `\n`;
@@ -599,7 +645,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
 
   const addPraticien = () => {
     if (!praticienForm.nom || !praticienForm.prenom) {
-      showError("Veuillez remplir nom et prénom");
+      alert("Veuillez remplir nom et pr├®nom");
       return;
     }
     setForm(prev => ({
@@ -616,13 +662,13 @@ const InstallationsSuiviPage = ({ onRetour }) => {
     }));
   };
 
-  // Définition des champs spécifiques par type de RDV
-  // Champs essentiels à saisir lors de la prise de RDV (Section 1)
+  // D├®finition des champs sp├®cifiques par type de RDV
+  // Champs essentiels ├á saisir lors de la prise de RDV (Section 1)
   const getEssentialFieldsForType = (type) => {
     switch (type) {
       case "Installation serveur":
         return [
-          { name: "nb_postes_secondaires", label: "Nombre de postes secondaires prévus", type: "number" }
+          { name: "nb_postes_secondaires", label: "Nombre de postes secondaires pr├®vus", type: "number" }
         ];
       case "Installation poste secondaire":
         return [];
@@ -635,15 +681,15 @@ const InstallationsSuiviPage = ({ onRetour }) => {
         ];
       case "Export BDD":
         return [
-          { name: "format_export", label: "Format d'export souhaité", type: "text" }
+          { name: "format_export", label: "Format d'export souhait├®", type: "text" }
         ];
-      case "Mise à jour":
+      case "Mise ├á jour":
         return [
-          { name: "version_cible", label: "Version ciblée", type: "text" }
+          { name: "version_cible", label: "Version cibl├®e", type: "text" }
         ];
-      case "Démo":
+      case "D├®mo":
         return [
-          { name: "logiciel_metier", label: "Logiciel métier actuel du cabinet", type: "text" }
+          { name: "logiciel_metier", label: "Logiciel m├®tier actuel du cabinet", type: "text" }
         ];
       case "Autre":
         return [
@@ -654,7 +700,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
     }
   };
 
-  // Champs détaillés à compléter lors de l'intervention (Section 2)
+  // Champs d├®taill├®s ├á compl├®ter lors de l'intervention (Section 2)
   const getDetailedFieldsForType = (type) => {
     switch (type) {
       case "Installation serveur":
@@ -680,22 +726,22 @@ const InstallationsSuiviPage = ({ onRetour }) => {
         ];
       case "Formation":
         return [
-          { name: "duree_prevue", label: "Durée prévue (heures)", type: "number" },
-          { name: "duree_reelle", label: "Durée réelle (heures)", type: "number" }
+          { name: "duree_prevue", label: "Dur├®e pr├®vue (heures)", type: "number" },
+          { name: "duree_reelle", label: "Dur├®e r├®elle (heures)", type: "number" }
         ];
       case "Export BDD":
         return [
-          { name: "type_donnees", label: "Type de données exportées", type: "text" },
+          { name: "type_donnees", label: "Type de donn├®es export├®es", type: "text" },
           { name: "taille_export", label: "Taille de l'export (Mo)", type: "number" }
         ];
-      case "Mise à jour":
+      case "Mise ├á jour":
         return [
-          { name: "version_base", label: "Version installée de base", type: "text" },
-          { name: "nb_postes", label: "Nombre de postes mis à jour", type: "number" }
+          { name: "version_base", label: "Version install├®e de base", type: "text" },
+          { name: "nb_postes", label: "Nombre de postes mis ├á jour", type: "number" }
         ];
-      case "Démo":
+      case "D├®mo":
         return [
-          { name: "fonctionnalites", label: "Fonctionnalités démontrées", type: "text" }
+          { name: "fonctionnalites", label: "Fonctionnalit├®s d├®montr├®es", type: "text" }
         ];
       case "Autre":
         return [
@@ -706,18 +752,18 @@ const InstallationsSuiviPage = ({ onRetour }) => {
     }
   };
 
-  // Vérifier si le type de RDV doit afficher la section praticiens
+  // V├®rifier si le type de RDV doit afficher la section praticiens
   const shouldShowPraticiens = (type) => {
     const typesWithoutPraticiens = [
       "Installation poste secondaire",
       "Changement de poste serveur",
-      "Mise à jour",
+      "Mise ├á jour",
       "Export BDD"
     ];
     return !typesWithoutPraticiens.includes(type);
   };
 
-  // Handler pour changer le type de RDV et réinitialiser les champs spécifiques
+  // Handler pour changer le type de RDV et r├®initialiser les champs sp├®cifiques
   const handleTypeChange = (newType) => {
     setForm({ ...form, type_rdv: newType });
     setSpecificFields({});
@@ -725,21 +771,20 @@ const InstallationsSuiviPage = ({ onRetour }) => {
 
   const handleChangeStatut = async (idRdv, newStatut) => {
     try {
-      await api.put(`/rendez-vous/${idRdv}/statut`, { statut: newStatut });
-      showSuccess("Statut mis à jour");
-      fetchRendezvous(true);
+      await axios.put(`http://localhost:4000/api/rendez-vous/${idRdv}/statut`, { statut: newStatut });
+      fetchRendezvous();
     } catch (error) {
       console.error("Erreur changement statut:", error);
-      showError("Erreur lors du changement de statut");
+      alert("Erreur lors du changement de statut");
     }
   };
 
   const getStatusBadge = (rdv) => {
     const colors = {
-      "Planifié": "bg-blue-100 text-blue-800 hover:bg-blue-200",
-      "Effectué": "bg-green-100 text-green-800 hover:bg-green-200",
-      "Facturé": "bg-purple-100 text-purple-800 hover:bg-purple-200 font-bold",
-      "Annulé": "bg-red-100 text-red-800 hover:bg-red-200"
+      "Planifi├®": "bg-blue-100 text-blue-800 hover:bg-blue-200",
+      "Effectu├®": "bg-green-100 text-green-800 hover:bg-green-200",
+      "Factur├®": "bg-purple-100 text-purple-800 hover:bg-purple-200 font-bold",
+      "Annul├®": "bg-red-100 text-red-800 hover:bg-red-200"
     };
     
     return (
@@ -756,10 +801,10 @@ const InstallationsSuiviPage = ({ onRetour }) => {
           paddingRight: '1.5rem'
         }}
       >
-        <option value="Planifié" style={{ backgroundColor: '#dbeafe', color: '#1e40af' }}>Planifié</option>
-        <option value="Effectué" style={{ backgroundColor: '#dcfce7', color: '#166534' }}>Effectué</option>
-        <option value="Facturé" style={{ backgroundColor: '#f3e8ff', color: '#6b21a8' }}>Facturé</option>
-        <option value="Annulé" style={{ backgroundColor: '#fee2e2', color: '#991b1b' }}>Annulé</option>
+        <option value="Planifi├®" style={{ backgroundColor: '#dbeafe', color: '#1e40af' }}>Planifi├®</option>
+        <option value="Effectu├®" style={{ backgroundColor: '#dcfce7', color: '#166534' }}>Effectu├®</option>
+        <option value="Factur├®" style={{ backgroundColor: '#f3e8ff', color: '#6b21a8' }}>Factur├®</option>
+        <option value="Annul├®" style={{ backgroundColor: '#fee2e2', color: '#991b1b' }}>Annul├®</option>
       </select>
     );
   };
@@ -772,39 +817,39 @@ const InstallationsSuiviPage = ({ onRetour }) => {
     return matchesSearch && matchesStatus && matchesType;
   });
 
-  // Nouvelle fonction pour vérifier et compléter les infos avant création de contrat
+  // Nouvelle fonction pour v├®rifier et compl├®ter les infos avant cr├®ation de contrat
   const handleCreateContratWithCheck = async (rdv, prix) => {
-    // Vérifie les champs obligatoires
+    // V├®rifie les champs obligatoires
     const champs = ['adresse', 'code_postal', 'ville'];
     const manquants = champs.filter(champ => !rdv[champ] || rdv[champ].trim() === '');
     if (manquants.length > 0) {
       setInfosManquantesModal({ open: true, rdv: { ...rdv, prix } });
       return;
     }
-    // Si tout est OK, crée le contrat
+    // Si tout est OK, cr├®e le contrat
     try {
-      await api.post(
-        `/rendez-vous/${rdv.id_rdv}/create-contrat`,
+      await axios.post(
+        `http://localhost:4000/api/rendez-vous/${rdv.id_rdv}/create-contrat`,
         { prix: parseFloat(prix), adresse: rdv.adresse, code_postal: rdv.code_postal, ville: rdv.ville }
       );
-      showSuccess('Contrat créé avec succès');
-      fetchRendezvous(true);
+      alert('Ô£ô Contrat cr├®├® avec succ├¿s !');
+      fetchRendezvous();
     } catch (error) {
-      console.error('Erreur création contrat:', error);
-      showError(error.response?.data?.error || 'Erreur lors de la création du contrat');
+      console.error('Erreur cr├®ation contrat:', error);
+      alert(error.response?.data?.error || 'Erreur lors de la cr├®ation du contrat');
     }
   };
 
   return (
     <div className="p-6">
-      {/* Formulaire simplifié - Prise de RDV uniquement */}
+      {/* Formulaire simplifi├® - Prise de RDV uniquement */}
       {showForm && (
         <div className="bg-white border rounded-lg p-6 mb-6 shadow">
           <h3 className="text-xl font-semibold mb-4">
-            {editingRdv ? "Modifier le rendez-vous" : "📅 Prise de rendez-vous"}
+            {editingRdv ? "Modifier le rendez-vous" : "­ƒôà Prise de rendez-vous"}
           </h3>
           <p className="text-sm text-gray-600 mb-4">
-            Remplissez uniquement les informations nécessaires à la prise de rendez-vous. Les détails d'intervention seront complétés après.
+            Remplissez uniquement les informations n├®cessaires ├á la prise de rendez-vous. Les d├®tails d'intervention seront compl├®t├®s apr├¿s.
           </p>
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* ...tous les champs du formulaire... */}
@@ -819,15 +864,15 @@ const InstallationsSuiviPage = ({ onRetour }) => {
               onClick={onRetour}
               className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded transition flex items-center gap-2"
             >
-              ← Retour à la liste simple
+              ÔåÉ Retour ├á la liste simple
             </button>
           )}
           <button
             disabled
             className="bg-gray-300 text-gray-500 px-4 py-2 rounded cursor-not-allowed flex items-center gap-2 opacity-60"
-            title="Fonctionnalité temporairement désactivée"
+            title="Fonctionnalit├® temporairement d├®sactiv├®e"
           >
-            📥 Importer ICS
+            ­ƒôÑ Importer ICS
           </button>
           <button
             onClick={() => {
@@ -841,7 +886,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
         </div>
       </div>
 
-      {/* La liste avancée est déjà affichée via le formulaire et le composant principal, on retire le doublon ici. */}
+      {/* La liste avanc├®e est d├®j├á affich├®e via le formulaire et le composant principal, on retire le doublon ici. */}
 
       {/* Import ICS Component */}
       {showImportICS && <ImportICS />}
@@ -850,7 +895,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
       <div className="mb-6 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border-2 border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
-            <h3 className="font-bold text-gray-700 dark:text-gray-300">📦 Gestion des archives</h3>
+            <h3 className="font-bold text-gray-700 dark:text-gray-300">­ƒôª Gestion des archives</h3>
           </div>
           
           <div className="flex items-center gap-2">
@@ -858,15 +903,15 @@ const InstallationsSuiviPage = ({ onRetour }) => {
               onClick={handleAutoArchive}
               className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded font-semibold transition"
             >
-              🗄️ Archiver mois précédent
+              ­ƒùä´©Å Archiver mois pr├®c├®dent
             </button>
           </div>
         </div>
         
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-          💡 Archive automatiquement tous les RDV <strong>effectués et facturés</strong> du mois précédent (sauf installations complètes sans contrat).
+          ­ƒÆí Archive automatiquement tous les RDV <strong>effectu├®s et factur├®s</strong> du mois pr├®c├®dent (sauf installations compl├¿tes sans contrat).
           <br />
-          ⚙️ L'archivage se fait aussi automatiquement chaque nuit à minuit.
+          ÔÜÖ´©Å L'archivage se fait aussi automatiquement chaque nuit ├á minuit.
         </p>
       </div>
 
@@ -886,18 +931,18 @@ const InstallationsSuiviPage = ({ onRetour }) => {
           }}
           className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-2 rounded text-sm transition"
         >
-          📅 Aujourd'hui
+          ­ƒôà Aujourd'hui
         </button>
         <button
           onClick={() => {
             setSearchTerm('');
             setStatusFilter('Tous');
             setTypeFilter('Tous');
-            // Filtrage semaine se fera dans le filtre côté rendu
+            // Filtrage semaine se fera dans le filtre c├┤t├® rendu
           }}
           className="bg-green-100 hover:bg-green-200 text-green-800 px-3 py-2 rounded text-sm transition"
         >
-          📆 Cette semaine
+          ­ƒôå Cette semaine
         </button>
         <button
           onClick={() => {
@@ -907,17 +952,17 @@ const InstallationsSuiviPage = ({ onRetour }) => {
           }}
           className="bg-purple-100 hover:bg-purple-200 text-purple-800 px-3 py-2 rounded text-sm transition"
         >
-          📊 Ce mois
+          ­ƒôè Ce mois
         </button>
         <button
           onClick={() => {
             setSearchTerm('');
-            setStatusFilter('Effectué');
+            setStatusFilter('Effectu├®');
             setTypeFilter('Tous');
           }}
           className="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-3 py-2 rounded text-sm transition"
         >
-          💰 À facturer
+          ­ƒÆ░ ├Ç facturer
         </button>
         <button
           onClick={() => {
@@ -927,11 +972,11 @@ const InstallationsSuiviPage = ({ onRetour }) => {
           }}
           className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-2 rounded text-sm transition"
         >
-          ↺ Réinitialiser
+          Ôå║ R├®initialiser
         </button>
       </div>
 
-      {/* Filtres avancés */}
+      {/* Filtres avanc├®s */}
       <div className="mb-6 flex gap-4 flex-wrap">
         <input
           type="text"
@@ -946,10 +991,10 @@ const InstallationsSuiviPage = ({ onRetour }) => {
           className="border px-4 py-2 rounded"
         >
           <option value="Tous">Tous les statuts</option>
-          <option value="Planifié">Planifié</option>
-          <option value="Effectué">Effectué</option>
-          <option value="Facturé">Facturé</option>
-          <option value="Annulé">Annulé</option>
+          <option value="Planifi├®">Planifi├®</option>
+          <option value="Effectu├®">Effectu├®</option>
+          <option value="Factur├®">Factur├®</option>
+          <option value="Annul├®">Annul├®</option>
         </select>
         <select
           value={typeFilter}
@@ -962,20 +1007,20 @@ const InstallationsSuiviPage = ({ onRetour }) => {
           <option value="Changement de poste serveur">Changement de poste serveur</option>
           <option value="Formation">Formation</option>
           <option value="Export BDD">Export BDD</option>
-          <option value="Démo">Démo</option>
-          <option value="Mise à jour">Mise à jour</option>
+          <option value="D├®mo">D├®mo</option>
+          <option value="Mise ├á jour">Mise ├á jour</option>
           <option value="Autre">Autre</option>
         </select>
       </div>
 
-      {/* Formulaire simplifié - Prise de RDV uniquement */}
+      {/* Formulaire simplifi├® - Prise de RDV uniquement */}
       {showForm && (
         <div className="bg-white border rounded-lg p-6 mb-6 shadow">
           <h3 className="text-xl font-semibold mb-4">
-            {editingRdv ? "Modifier le rendez-vous" : "📅 Prise de rendez-vous"}
+            {editingRdv ? "Modifier le rendez-vous" : "­ƒôà Prise de rendez-vous"}
           </h3>
           <p className="text-sm text-gray-600 mb-4">
-            Remplissez uniquement les informations nécessaires à la prise de rendez-vous. Les détails d'intervention seront complétés après.
+            Remplissez uniquement les informations n├®cessaires ├á la prise de rendez-vous. Les d├®tails d'intervention seront compl├®t├®s apr├¿s.
           </p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -989,7 +1034,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                   value={form.cabinet}
                   onChange={(e) => setForm({ ...form, cabinet: e.target.value })}
                   className="w-full border px-3 py-2 rounded"
-                  placeholder={form.type_rdv === 'Autre' ? 'Nom du rendez-vous...' : 'Cabinet médical...'}
+                  placeholder={form.type_rdv === 'Autre' ? 'Nom du rendez-vous...' : 'Cabinet m├®dical...'}
                 />
               </div>
               <div>
@@ -1005,8 +1050,8 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                   <option value="Changement de poste serveur">Changement de poste serveur</option>
                   <option value="Formation">Formation</option>
                   <option value="Export BDD">Export BDD</option>
-                  <option value="Démo">Démo</option>
-                  <option value="Mise à jour">Mise à jour</option>
+                  <option value="D├®mo">D├®mo</option>
+                  <option value="Mise ├á jour">Mise ├á jour</option>
                   <option value="Autre">Autre</option>
                 </select>
               </div>
@@ -1030,7 +1075,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                   className="w-full border px-3 py-2 rounded"
                 />
               </div>
-              {/* Champs dynamiques pour installation complète */}
+              {/* Champs dynamiques pour installation compl├¿te */}
               {(form.type_rdv === 'Installation serveur' || form.type_rdv === 'Installation poste secondaire' || form.type_rdv === 'Changement de poste serveur') && <>
                 <div>
                   <label className="block text-sm font-medium mb-1">Email <span className="text-red-500 font-normal">*</span></label>
@@ -1051,7 +1096,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                     value={form.adresse}
                     onChange={(e) => setForm({ ...form, adresse: e.target.value })}
                     className={`w-full border px-3 py-2 rounded ${form.adresse === '' ? 'border-red-500' : ''}`}
-                    placeholder="12 rue de la Santé"
+                    placeholder="12 rue de la Sant├®"
                   />
                 </div>
                 <div>
@@ -1095,18 +1140,16 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                   <input
                     type="text"
                     required
-                    value={Array.isArray(form.praticiens)
-                      ? form.praticiens.map(p => `${p.prenom || ''} ${p.nom || ''}`.trim()).filter(Boolean).join(', ')
-                      : (form.praticiens || '')}
-                    onChange={e => setForm({ ...form, praticiens: parsePraticiensInput(e.target.value) })}
-                    className={`w-full border px-3 py-2 rounded ${(!Array.isArray(form.praticiens) || form.praticiens.length === 0) ? 'border-red-500' : ''}`}
+                    value={form.praticiens}
+                    onChange={e => setForm({ ...form, praticiens: e.target.value })}
+                    className={`w-full border px-3 py-2 rounded ${form.praticiens === '' ? 'border-red-500' : ''}`}
                     placeholder="Dr Dupont, Dr Martin..."
                   />
                 </div>
               </>}
-              {/* Champ téléphone toujours présent */}
+              {/* Champ t├®l├®phone toujours pr├®sent */}
               <div>
-                <label className="block text-sm font-medium mb-1">Téléphone <span className="text-gray-500 font-normal">(optionnel)</span></label>
+                <label className="block text-sm font-medium mb-1">T├®l├®phone <span className="text-gray-500 font-normal">(optionnel)</span></label>
                 <input
                   type="tel"
                   value={form.telephone}
@@ -1138,7 +1181,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                    !Array.isArray(form.praticiens) || form.praticiens.length === 0) ? 'cursor-not-allowed' : ''
                 }`}
               >
-                {loading ? "⏳" : editingRdv ? "Modifier" : "Créer"}
+                {loading ? "ÔÅ│" : editingRdv ? "Modifier" : "Cr├®er"}
               </button>
               {(form.type_rdv === 'Installation serveur' || form.type_rdv === 'Installation poste secondaire' || form.type_rdv === 'Changement de poste serveur') &&
                 (!form.email || typeof form.email !== "string" || form.email.trim() === "" ||
@@ -1185,11 +1228,11 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                       title="Voir l'historique de ce cabinet"
                     >
                       {rdv.cabinet}
-                      <span className="text-xs text-gray-400 hover:text-gray-600">📂</span>
+                      <span className="text-xs text-gray-400 hover:text-gray-600">­ƒôé</span>
                     </h3>
                     {rdv.archive && (
                       <span className="bg-gray-500 text-white text-xs px-2 py-1 rounded font-semibold">
-                        📦 ARCHIVÉ
+                        ­ƒôª ARCHIV├ë
                       </span>
                     )}
                   </div>
@@ -1199,10 +1242,10 @@ const InstallationsSuiviPage = ({ onRetour }) => {
               </div>
               
               <div className="text-sm space-y-1 mb-3">
-                <p><strong>📅 Date:</strong> {rdv.date_rdv.split('T')[0].split('-').reverse().join('/')} à {rdv.heure_rdv}</p>
-                <p><strong>📍 Lieu:</strong> {rdv.adresse}, {rdv.code_postal} {rdv.ville}</p>
+                <p><strong>­ƒôà Date:</strong> {rdv.date_rdv.split('T')[0].split('-').reverse().join('/')} ├á {rdv.heure_rdv}</p>
+                <p><strong>­ƒôì Lieu:</strong> {rdv.adresse}, {rdv.code_postal} {rdv.ville}</p>
                 {(() => {
-                  // Parser praticiens si nécessaire
+                  // Parser praticiens si n├®cessaire
                   let praticiens = rdv.praticiens;
                   if (typeof praticiens === 'string') {
                     try {
@@ -1213,7 +1256,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                   }
                   
                   return praticiens && Array.isArray(praticiens) && praticiens.length > 0 && (
-                    <p><strong>👥 Praticiens:</strong> {praticiens.map(p => {
+                    <p><strong>­ƒæÑ Praticiens:</strong> {praticiens.map(p => {
                       if (typeof p === 'object' && p.prenom && p.nom) {
                         return `${p.prenom} ${p.nom}`;
                       } else if (typeof p === 'string') {
@@ -1224,10 +1267,10 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                   );
                 })()}
                 {rdv.id_contrat && (
-                  <p className="text-green-600"><strong>📄 Contrat lié:</strong> #{rdv.id_contrat}</p>
+                  <p className="text-green-600"><strong>­ƒôä Contrat li├®:</strong> #{rdv.id_contrat}</p>
                 )}
                 
-                {/* Notes formatées avec champs spécifiques et checklist */}
+                {/* Notes format├®es avec champs sp├®cifiques et checklist */}
                 {rdv.notes && (() => {
                   try {
                     const notesData = JSON.parse(rdv.notes);
@@ -1240,22 +1283,22 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                     return (
                       <div className="mt-2 border-t pt-2">
                         <div className="max-h-40 overflow-y-auto bg-gray-50 rounded p-2 space-y-2">
-                          {/* Champs spécifiques */}
+                          {/* Champs sp├®cifiques */}
                           {hasSpecificFields && (
                             <div>
-                              <p className="font-semibold text-xs text-gray-700 mb-1">⚙️ Informations techniques:</p>
+                              <p className="font-semibold text-xs text-gray-700 mb-1">ÔÜÖ´©Å Informations techniques:</p>
                               <ul className="text-xs space-y-0.5 ml-3">
                                 {Object.entries(notesData.specificFields).map(([key, value]) => (
-                                  value && <li key={key} className="text-gray-700">• <span className="font-medium">{key.replace(/_/g, ' ')}:</span> {value}</li>
+                                  value && <li key={key} className="text-gray-700">ÔÇó <span className="font-medium">{key.replace(/_/g, ' ')}:</span> {value}</li>
                                 ))}
                               </ul>
                             </div>
                           )}
                           
-                          {/* Notes générales */}
+                          {/* Notes g├®n├®rales */}
                           {hasGeneralNotes && (
                             <div>
-                              <p className="font-semibold text-xs text-gray-700 mb-1">📝 Notes:</p>
+                              <p className="font-semibold text-xs text-gray-700 mb-1">­ƒôØ Notes:</p>
                               <p className="text-xs text-gray-600 whitespace-pre-line ml-3">{notesData.generalNotes}</p>
                             </div>
                           )}
@@ -1263,11 +1306,11 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                           {/* Checklist */}
                           {hasChecklist && (
                             <div>
-                              <p className="font-semibold text-xs text-gray-700 mb-1">✓ Checklist ({notesData.checklist.filter(c => c.checked).length}/{notesData.checklist.length}):</p>
+                              <p className="font-semibold text-xs text-gray-700 mb-1">Ô£ô Checklist ({notesData.checklist.filter(c => c.checked).length}/{notesData.checklist.length}):</p>
                               <ul className="text-xs space-y-0.5 ml-3">
                                 {notesData.checklist.map(item => (
                                   <li key={item.id} className={item.checked ? "text-green-700" : "text-gray-500"}>
-                                    {item.checked ? "✓" : "○"} {item.label}
+                                    {item.checked ? "Ô£ô" : "Ôùï"} {item.label}
                                   </li>
                                 ))}
                               </ul>
@@ -1278,107 +1321,123 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                     );
                   } catch (e) {
                     // Si les notes ne sont pas au format JSON, afficher en texte brut
-                    return <p className="mt-2 text-xs text-gray-600 max-h-20 overflow-y-auto"><strong>📝 Notes:</strong> {rdv.notes}</p>;
+                    return <p className="mt-2 text-xs text-gray-600 max-h-20 overflow-y-auto"><strong>­ƒôØ Notes:</strong> {rdv.notes}</p>;
                   }
                 })()}
               </div>
 
-              <div className="flex flex-col gap-2">
-                <div className="flex gap-2 flex-wrap items-center">
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={() => downloadICS(rdv)}
+                  className="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600"
+                >
+                  ­ƒôà T├®l├®charger .ics
+                </button>
+                <button
+                  onClick={() => copyGrcTextFromRdv(rdv)}
+                  className="bg-cyan-500 text-white px-3 py-1 rounded text-sm hover:bg-cyan-600"
+                >
+                  ­ƒôï Texte GRC
+                </button>
+                <button
+                  onClick={() => {
+                    const template = getChecklistForType(rdv.type_rdv);
+                    // Charger la checklist sauvegard├®e ou utiliser le template
+                    let savedChecklist = [];
+                    try {
+                      const notesData = JSON.parse(rdv.notes || '{}');
+                      savedChecklist = notesData.checklist || [];
+                    } catch {}
+                    
+                    if (savedChecklist.length > 0) {
+                      setCurrentChecklist(savedChecklist);
+                    } else {
+                      setCurrentChecklist(template.map(item => ({ ...item, checked: false })));
+                    }
+                    setChecklistModalRdv(rdv);
+                  }}
+                  className="bg-teal-500 text-white px-3 py-1 rounded text-sm hover:bg-teal-600"
+                >
+                  Ô£ô Checklist
+                </button>
+                <button
+                  onClick={() => handleDuplicate(rdv)}
+                  className="bg-indigo-500 text-white px-3 py-1 rounded text-sm hover:bg-indigo-600"
+                >
+                  ­ƒôï Dupliquer
+                </button>
+                {rdv.statut === "Planifi├®" && (
                   <button
-                    onClick={() => downloadICS(rdv)}
-                    className="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600"
+                    onClick={() => handleComplete(rdv)}
+                    className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600"
                   >
-                    📅 Télécharger .ics
+                    Ô£ô Marquer comme Effectu├®
                   </button>
-                  <button
-                    onClick={() => copyGrcTextFromRdv(rdv)}
-                    className="bg-cyan-500 text-white px-3 py-1 rounded text-sm hover:bg-cyan-600"
-                  >
-                    📋 Texte GRC
-                  </button>
-                  {rdv.statut === "Planifié" && (
+                )}
+                {rdv.statut === "Effectu├®" && (
+                  <>
                     <button
-                      onClick={() => handleComplete(rdv)}
-                      className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600"
+                      onClick={() => handleFacturer(rdv.id_rdv)}
+                      className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600"
                     >
-                      ✓ Marquer comme Effectué
+                      ­ƒÆ░ Marquer comme Factur├®
                     </button>
-                  )}
-                  {rdv.statut === "Effectué" && (
-                    <>
-                      <button
-                        onClick={() => handleFacturer(rdv.id_rdv)}
-                        className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600"
-                      >
-                        💰 Marquer comme Facturé
-                      </button>
-                      <button
-                        onClick={() => handleReplanifier(rdv.id_rdv)}
-                        className="bg-orange-500 text-white px-3 py-1 rounded text-sm hover:bg-orange-600"
-                      >
-                        ↩️ Replanifier
-                      </button>
-                    </>
-                  )}
-                  {rdv.id_contrat && (
                     <button
-                      onClick={() => handleRegenerateContrat(rdv)}
-                      className="bg-pink-500 text-white px-3 py-1 rounded text-sm hover:bg-pink-600"
-                      title="Régénérer le contrat avec les données actuelles"
+                      onClick={() => handleReplanifier(rdv.id_rdv)}
+                      className="bg-orange-500 text-white px-3 py-1 rounded text-sm hover:bg-orange-600"
                     >
-                      🔄 Régénérer contrat
+                      Ôå®´©Å Replanifier
                     </button>
-                  )}
+                  </>
+                )}
+                {rdv.id_contrat && (
                   <button
-                    onClick={() => setTreatmentModalRdv(rdv)}
-                    className="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600"
-                    title="Traiter l'intervention - Compléter les détails"
+                    onClick={() => handleRegenerateContrat(rdv)}
+                    className="bg-pink-500 text-white px-3 py-1 rounded text-sm hover:bg-pink-600"
+                    title="R├®g├®n├®rer le contrat avec les donn├®es actuelles"
                   >
-                    🔧 Traiter
+                    ­ƒöä R├®g├®n├®rer contrat
                   </button>
-                </div>
-
-                <div className="flex gap-2 flex-wrap items-center justify-end text-xs">
+                )}
+                <button
+                  onClick={() => setTreatmentModalRdv(rdv)}
+                  className="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600"
+                  title="Traiter l'intervention - Compl├®ter les d├®tails"
+                >
+                  ­ƒöº Traiter
+                </button>
+                <button
+                  onClick={() => handleEdit(rdv)}
+                  className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
+                >
+                  Ô£Å´©Å Modifier
+                </button>
+                {rdv.archive ? (
                   <button
-                    onClick={() => handleDuplicate(rdv)}
-                    className="bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1 rounded hover:bg-slate-200"
+                    onClick={() => handleUnarchiveRdv(rdv.id_rdv)}
+                    className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600"
                   >
-                    📋 Dupliquer
+                    ­ƒôé Restaurer
                   </button>
+                ) : (
                   <button
-                    onClick={() => handleEdit(rdv)}
-                    className="bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1 rounded hover:bg-slate-200"
+                    onClick={() => handleArchiveRdv(rdv.id_rdv)}
+                    className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600"
                   >
-                    ✏️ Modifier
+                    ­ƒôª Archiver
                   </button>
-                  {rdv.archive ? (
-                    <button
-                      onClick={() => handleUnarchiveRdv(rdv.id_rdv)}
-                      className="bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1 rounded hover:bg-slate-200"
-                    >
-                      📂 Restaurer
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleArchiveRdv(rdv.id_rdv)}
-                      className="bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1 rounded hover:bg-slate-200"
-                    >
-                      📦 Archiver
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleDelete(rdv.id_rdv)}
-                    className="bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1 rounded hover:bg-slate-200"
-                  >
-                    🗑️ Supprimer
-                  </button>
-                </div>
+                )}
+                <button
+                  onClick={() => handleDelete(rdv.id_rdv)}
+                  className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
+                >
+                  ­ƒùæ´©Å Supprimer
+                </button>
               </div>
             </div>
           ))}
           {filteredRdv.length === 0 && (
-            <p className="text-gray-500 text-center py-8">Aucun rendez-vous trouvé</p>
+            <p className="text-gray-500 text-center py-8">Aucun rendez-vous trouv├®</p>
           )}
         </div>
         
@@ -1390,7 +1449,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
               disabled={currentPage === 1}
               className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded"
             >
-              ← Précédent
+              ÔåÉ Pr├®c├®dent
             </button>
             <span className="text-sm font-medium text-gray-700">
               Page {currentPage} / {Math.ceil(filteredRdv.length / rdvPerPage)}
@@ -1400,27 +1459,27 @@ const InstallationsSuiviPage = ({ onRetour }) => {
               disabled={currentPage === Math.ceil(filteredRdv.length / rdvPerPage)}
               className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded"
             >
-              Suivant →
+              Suivant ÔåÆ
             </button>
           </div>
         )}
         </>
       )}
 
-      {/* Modal Marquer comme Effectué */}
+      {/* Modal Marquer comme Effectu├® */}
       {completeModalRdv && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4">RDV Effectué - {completeModalRdv.cabinet}</h3>
+            <h3 className="text-xl font-bold mb-4">RDV Effectu├® - {completeModalRdv.cabinet}</h3>
             
             <div className="mb-4">
               <div className="flex justify-between items-center mb-2">
-                <label className="block text-sm font-medium">Texte GRC à copier:</label>
+                <label className="block text-sm font-medium">Texte GRC ├á copier:</label>
                 <button
                   onClick={copyGrcToClipboard}
                   className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
                 >
-                  {copiedGrc ? "✓ Copié !" : "📋 Copier"}
+                  {copiedGrc ? "Ô£ô Copi├® !" : "­ƒôï Copier"}
                 </button>
               </div>
               <textarea
@@ -1440,12 +1499,12 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                     onChange={(e) => setShowContratForm(e.target.checked)}
                     className="w-4 h-4"
                   />
-                  <span className="font-medium">Créer un contrat de service pour ce RDV</span>
+                  <span className="font-medium">Cr├®er un contrat de service pour ce RDV</span>
                 </label>
                 
                 {showContratForm && (
                   <div className="ml-6 space-y-2">
-                    <label className="block text-sm font-medium">Prix du contrat (€)</label>
+                    <label className="block text-sm font-medium">Prix du contrat (Ôé¼)</label>
                     <input
                       type="number"
                       step="0.01"
@@ -1460,7 +1519,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                       disabled={creatingContrat}
                       className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 disabled:opacity-50"
                     >
-                      {creatingContrat ? "⏳ Création..." : "Créer le contrat"}
+                      {creatingContrat ? "ÔÅ│ Cr├®ation..." : "Cr├®er le contrat"}
                     </button>
                   </div>
                 )}
@@ -1482,12 +1541,12 @@ const InstallationsSuiviPage = ({ onRetour }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-2xl font-bold">📂 Historique - {cabinetHistoryModal}</h3>
+              <h3 className="text-2xl font-bold">­ƒôé Historique - {cabinetHistoryModal}</h3>
               <button
                 onClick={() => setCabinetHistoryModal(null)}
                 className="text-gray-500 hover:text-gray-700 text-2xl"
               >
-                ×
+                ├ù
               </button>
             </div>
             
@@ -1501,16 +1560,16 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                       <div>
                         <h4 className="font-semibold text-lg">{rdv.type_rdv}</h4>
                         <p className="text-sm text-gray-600">
-                          {rdv.date_rdv.split('T')[0].split('-').reverse().join('/')} à {rdv.heure_rdv}
+                          {rdv.date_rdv.split('T')[0].split('-').reverse().join('/')} ├á {rdv.heure_rdv}
                         </p>
                       </div>
                       {getStatusBadge(rdv)}
                     </div>
                     
                     <div className="text-sm space-y-1">
-                      <p><strong>📍</strong> {rdv.ville}</p>
+                      <p><strong>­ƒôì</strong> {rdv.ville}</p>
                       {(() => {
-                        // Parser praticiens si nécessaire
+                        // Parser praticiens si n├®cessaire
                         let praticiens = rdv.praticiens;
                         if (typeof praticiens === 'string') {
                           try {
@@ -1521,7 +1580,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                         }
                         
                         return praticiens && Array.isArray(praticiens) && praticiens.length > 0 && (
-                          <p><strong>👥</strong> {praticiens.map(p => {
+                          <p><strong>­ƒæÑ</strong> {praticiens.map(p => {
                             if (typeof p === 'object' && p.prenom && p.nom) {
                               return `${p.prenom} ${p.nom}`;
                             } else if (typeof p === 'string') {
@@ -1533,7 +1592,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                       })()}
                       {rdv.notes && (
                         <p className="text-gray-700 mt-2">
-                          <strong>📝 Notes:</strong> {rdv.notes.length > 100 ? rdv.notes.substring(0, 100) + '...' : rdv.notes}
+                          <strong>­ƒôØ Notes:</strong> {rdv.notes.length > 100 ? rdv.notes.substring(0, 100) + '...' : rdv.notes}
                         </p>
                       )}
                     </div>
@@ -1546,7 +1605,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                         }}
                         className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
                       >
-                        ✏️ Modifier
+                        Ô£Å´©Å Modifier
                       </button>
                       <button
                         onClick={() => {
@@ -1555,14 +1614,14 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                         }}
                         className="bg-indigo-500 text-white px-3 py-1 rounded text-sm hover:bg-indigo-600"
                       >
-                        📋 Dupliquer
+                        ­ƒôï Dupliquer
                       </button>
                     </div>
                   </div>
                 ))}
               
               {rendezvous.filter(rdv => rdv.cabinet === cabinetHistoryModal).length === 0 && (
-                <p className="text-gray-500 text-center py-8">Aucun RDV trouvé pour ce cabinet</p>
+                <p className="text-gray-500 text-center py-8">Aucun RDV trouv├® pour ce cabinet</p>
               )}
             </div>
 
@@ -1576,7 +1635,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
         </div>
       )}
 
-      {/* Modal Prévisualisation Texte GRC */}
+      {/* Modal Pr├®visualisation Texte GRC */}
       {previewGrcModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -1586,18 +1645,18 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                 onClick={() => setPreviewGrcModal(null)}
                 className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
               >
-                ×
+                ├ù
               </button>
             </div>
 
             <div className="mb-4">
               <div className="flex justify-between items-center mb-2">
-                <label className="block text-sm font-medium">Texte à copier:</label>
+                <label className="block text-sm font-medium">Texte ├á copier:</label>
                 <button
                   onClick={copyPreviewGrcToClipboard}
                   className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
                 >
-                  {copiedRdvId === previewGrcModal.id_rdv ? "✓ Copié !" : "📋 Copier"}
+                  {copiedRdvId === previewGrcModal.id_rdv ? "Ô£ô Copi├® !" : "­ƒôï Copier"}
                 </button>
               </div>
               <textarea
@@ -1620,35 +1679,153 @@ const InstallationsSuiviPage = ({ onRetour }) => {
         </div>
       )}
 
-      {/* Modal Traitement RDV - Complétion des détails d'intervention */}
+      {/* Modal Checklist */}
+      {checklistModalRdv && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-2xl font-bold">Ô£ô Checklist - {checklistModalRdv.type_rdv}</h3>
+                <p className="text-sm text-gray-600">{checklistModalRdv.cabinet}</p>
+              </div>
+              <button
+                onClick={() => setChecklistModalRdv(null)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ├ù
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    {form.type_rdv === 'Autre' ? 'Nom du rendez-vous *' : 'Nom du cabinet *'}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={form.cabinet}
+                    onChange={(e) => setForm({ ...form, cabinet: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                    placeholder={form.type_rdv === 'Autre' ? 'Nom du rendez-vous...' : 'Cabinet m├®dical...'}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Type *</label>
+                  <select
+                    required
+                    value={form.type_rdv}
+                    onChange={(e) => handleTypeChange(e.target.value)}
+                    className="w-full border px-3 py-2 rounded"
+                  >
+                    <option value="Installation serveur">Installation serveur</option>
+                    <option value="Installation poste secondaire">Installation poste secondaire</option>
+                    <option value="Changement de poste serveur">Changement de poste serveur</option>
+                    <option value="Formation">Formation</option>
+                    <option value="Export BDD">Export BDD</option>
+                    <option value="D├®mo">D├®mo</option>
+                    <option value="Mise ├á jour">Mise ├á jour</option>
+                    <option value="Autre">Autre</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={form.date_rdv}
+                    onChange={(e) => setForm({ ...form, date_rdv: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Heure *</label>
+                  <input
+                    type="time"
+                    required
+                    value={form.heure_rdv}
+                    onChange={(e) => setForm({ ...form, heure_rdv: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                    placeholder="contact@cabinet.fr"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Adresse *</label>
+                  <input
+                    type="text"
+                    required
+                    value={form.adresse}
+                    onChange={(e) => setForm({ ...form, adresse: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                    placeholder="12 rue de la Sant├®"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Ville *</label>
+                  <input
+                    type="text"
+                    required
+                    value={form.ville}
+                    onChange={(e) => setForm({ ...form, ville: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                    placeholder="Paris"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium mb-1">Praticiens <span className="text-gray-500 font-normal">(optionnel)</span></label>
+                  <input
+                    type="text"
+                    value={form.praticiens || ''}
+                    onChange={(e) => setForm({ ...form, praticiens: e.target.value })}
+                    className="w-full border px-3 py-2 rounded"
+                    placeholder="Dr Dupont, Dr Martin..."
+                  />
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Traitement RDV - Compl├®tion des d├®tails d'intervention */}
       {treatmentModalRdv && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-              🔧 Traitement de l'intervention - {treatmentModalRdv.cabinet}
+              ­ƒöº Traitement de l'intervention - {treatmentModalRdv.cabinet}
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              Complétez les informations détaillées de l'intervention avant de la facturer
+              Compl├®tez les informations d├®taill├®es de l'intervention avant de la facturer
             </p>
 
             <div className="space-y-6">
               {/* Informations de base (lecture seule) */}
               <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
-                <h3 className="font-bold text-blue-900 dark:text-blue-100 mb-2">📋 Informations du RDV</h3>
+                <h3 className="font-bold text-blue-900 dark:text-blue-100 mb-2">­ƒôï Informations du RDV</h3>
                 <div className="grid grid-cols-2 gap-2 text-sm text-blue-800 dark:text-blue-200">
                   <div><strong>Type:</strong> {treatmentModalRdv.type_rdv}</div>
                   <div><strong>Date:</strong> {new Date(treatmentModalRdv.date_rdv).toLocaleDateString('fr-FR')}</div>
                   <div><strong>Heure:</strong> {treatmentModalRdv.heure_rdv}</div>
-                  <div><strong>Téléphone:</strong> {treatmentModalRdv.telephone || 'Non renseigné'}</div>
-                  <div className="col-span-2"><strong>Email:</strong> {treatmentModalRdv.email || 'Non renseigné'}</div>
-                  <div className="col-span-2"><strong>Adresse:</strong> {treatmentModalRdv.adresse || 'Non renseignée'}, {treatmentModalRdv.code_postal} {treatmentModalRdv.ville}</div>
+                  <div><strong>T├®l├®phone:</strong> {treatmentModalRdv.telephone || 'Non renseign├®'}</div>
+                  <div className="col-span-2"><strong>Email:</strong> {treatmentModalRdv.email || 'Non renseign├®'}</div>
+                  <div className="col-span-2"><strong>Adresse:</strong> {treatmentModalRdv.adresse || 'Non renseign├®e'}, {treatmentModalRdv.code_postal} {treatmentModalRdv.ville}</div>
                 </div>
               </div>
 
-              {/* Champs spécifiques selon le type */}
+              {/* Champs sp├®cifiques selon le type */}
               {getDetailedFieldsForType(treatmentModalRdv.type_rdv).length > 0 && (
                 <div className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg p-4">
-                  <h3 className="font-bold text-gray-800 dark:text-white mb-3">⚙️ Informations techniques - {treatmentModalRdv.type_rdv}</h3>
+                  <h3 className="font-bold text-gray-800 dark:text-white mb-3">ÔÜÖ´©Å Informations techniques - {treatmentModalRdv.type_rdv}</h3>
                   <div className="grid grid-cols-2 gap-4">
                     {getDetailedFieldsForType(treatmentModalRdv.type_rdv).map(field => (
                       <div key={field.name}>
@@ -1674,7 +1851,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
               {/* Praticiens */}
               {shouldShowPraticiens(treatmentModalRdv.type_rdv) && (
                 <div className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg p-4">
-                  <h3 className="font-bold text-gray-800 dark:text-white mb-3">👨‍⚕️ Praticiens</h3>
+                  <h3 className="font-bold text-gray-800 dark:text-white mb-3">­ƒæ¿ÔÇìÔÜò´©Å Praticiens</h3>
                   <div className="flex gap-2 mb-3">
                     <input
                       type="text"
@@ -1685,7 +1862,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                     />
                     <input
                       type="text"
-                      placeholder="Prénom"
+                      placeholder="Pr├®nom"
                       value={praticienForm.prenom}
                       onChange={(e) => setPraticienForm({ ...praticienForm, prenom: e.target.value })}
                       className="border border-gray-300 dark:border-gray-600 px-3 py-2 rounded flex-1 dark:bg-gray-700 dark:text-white"
@@ -1718,7 +1895,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                           })}
                           className="text-red-500 hover:text-red-700"
                         >
-                          ✕
+                          Ô£ò
                         </button>
                       </div>
                     ))}
@@ -1730,7 +1907,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
               {treatmentForm.checklist && treatmentForm.checklist.length > 0 && (
                 <div className="border rounded-lg p-4" style={{ backgroundColor: '#D1FAE5', borderColor: '#10B981' }}>
                   <h3 className="font-bold mb-3" style={{ color: '#065F46', fontSize: '18px' }}>
-                    ✅ Checklist - {treatmentModalRdv.type_rdv}
+                    Ô£à Checklist - {treatmentModalRdv.type_rdv}
                   </h3>
                   <div className="space-y-2">
                     {treatmentForm.checklist.map((item, index) => (
@@ -1772,26 +1949,26 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                 </div>
               )}
 
-              {/* Notes générales */}
+              {/* Notes g├®n├®rales */}
               <div className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg p-4">
-                <h3 className="font-bold text-gray-800 dark:text-white mb-3">📝 Notes de l'intervention</h3>
+                <h3 className="font-bold text-gray-800 dark:text-white mb-3">­ƒôØ Notes de l'intervention</h3>
                 <textarea
                   value={treatmentForm.notes}
                   onChange={(e) => setTreatmentForm({ ...treatmentForm, notes: e.target.value })}
                   rows="4"
                   className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 dark:bg-gray-700 dark:text-white"
-                  placeholder="Notes complémentaires sur l'intervention..."
+                  placeholder="Notes compl├®mentaires sur l'intervention..."
                 />
               </div>
 
-              {/* Génération de contrat pour Installation serveur */}
+              {/* G├®n├®ration de contrat pour Installation serveur */}
               {treatmentModalRdv.type_rdv === 'Installation serveur' && !treatmentModalRdv.id_contrat && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                  <h3 className="font-bold text-blue-900 mb-3">📄 Contrat de service</h3>
-                  <p className="text-sm text-blue-700 mb-3">Créer un contrat de service pour cette installation</p>
+                  <h3 className="font-bold text-blue-900 mb-3">­ƒôä Contrat de service</h3>
+                  <p className="text-sm text-blue-700 mb-3">Cr├®er un contrat de service pour cette installation</p>
                   <div className="flex gap-3 items-end">
                     <div className="flex-1">
-                      <label className="block text-sm font-medium text-blue-900 mb-1">Prix du contrat (€)</label>
+                      <label className="block text-sm font-medium text-blue-900 mb-1">Prix du contrat (Ôé¼)</label>
                       <input
                         type="number"
                         step="0.01"
@@ -1805,28 +1982,28 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                     <button
                       onClick={async () => {
                         if (!contratPrix || parseFloat(contratPrix) <= 0) {
-                          showError('Veuillez entrer un prix valide');
+                          alert('Veuillez entrer un prix valide');
                           return;
                         }
                         setCreatingContrat(true);
                         try {
-                          await api.post(
-                                `/rendez-vous/${treatmentModalRdv.id_rdv}/create-contrat`,
+                          await axios.post(
+                            `http://localhost:4000/api/rendez-vous/${treatmentModalRdv.id_rdv}/create-contrat`,
                             { prix: parseFloat(contratPrix) }
                           );
-                              showSuccess('Contrat créé avec succès');
+                          alert('Contrat cr├®├® avec succ├¿s !');
                           setContratPrix('');
                           fetchRendezvous();
                         } catch (error) {
                           console.error('Erreur:', error);
-                              showError(error.response?.data?.error || 'Erreur lors de la création du contrat');
+                          alert(error.response?.data?.error || 'Erreur lors de la cr├®ation du contrat');
                         }
                         setCreatingContrat(false);
                       }}
                       disabled={creatingContrat}
                       className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
                     >
-                      {creatingContrat ? '⏳' : '📄 Générer contrat'}
+                      {creatingContrat ? 'ÔÅ│' : '­ƒôä G├®n├®rer contrat'}
                     </button>
                   </div>
                 </div>
@@ -1844,26 +2021,26 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                         checklist: treatmentForm.checklist
                       });
                       
-                      await api.put(`/rendez-vous/${treatmentModalRdv.id_rdv}`, {
+                      await axios.put(`http://localhost:4000/api/rendez-vous/${treatmentModalRdv.id_rdv}`, {
                         praticiens: treatmentForm.praticiens,
                         notes: updatedNotes
                       });
                       
-                      showSuccess('Détails de l\'intervention sauvegardés');
+                      alert('D├®tails de l\'intervention sauvegard├®s !');
                       setTreatmentModalRdv(null);
                       fetchRendezvous();
                     } catch (error) {
                       console.error('Erreur sauvegarde:', error);
-                      showError('Erreur lors de la sauvegarde');
+                      alert('Erreur lors de la sauvegarde');
                     }
                   }}
                   className="flex-1 bg-blue-500 text-white px-6 py-3 rounded hover:bg-blue-600 transition font-semibold"
                 >
-                  💾 Sauvegarder les détails
+                  ­ƒÆ¥ Sauvegarder les d├®tails
                 </button>
                 <button
                   onClick={async () => {
-                    // Marquer comme effectué et sauvegarder
+                    // Marquer comme effectu├® et sauvegarder
                     try {
                       const updatedNotes = JSON.stringify({
                         specificFields: treatmentForm.specificFields,
@@ -1871,23 +2048,23 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                         checklist: treatmentForm.checklist
                       });
                       
-                      await api.put(`/rendez-vous/${treatmentModalRdv.id_rdv}`, {
-                        statut: 'Effectué',
+                      await axios.put(`http://localhost:4000/api/rendez-vous/${treatmentModalRdv.id_rdv}`, {
+                        statut: 'Effectu├®',
                         praticiens: treatmentForm.praticiens,
                         notes: updatedNotes
                       });
                       
-                      showSuccess('Intervention marquée comme effectuée');
+                      alert('Intervention marqu├®e comme effectu├®e !');
                       setTreatmentModalRdv(null);
                       fetchRendezvous();
                     } catch (error) {
                       console.error('Erreur:', error);
-                      showError('Erreur lors de la sauvegarde');
+                      alert('Erreur lors de la sauvegarde');
                     }
                   }}
                   className="flex-1 bg-green-500 text-white px-6 py-3 rounded hover:bg-green-600 transition font-semibold"
                 >
-                  ✓ Marquer comme Effectué
+                  Ô£ô Marquer comme Effectu├®
                 </button>
                 <button
                   onClick={() => {
@@ -1904,10 +2081,10 @@ const InstallationsSuiviPage = ({ onRetour }) => {
         </div>
       )}
 
-      {/* Modal pour compléter les infos manquantes lors de la création de contrat */}
+      {/* Modal pour compl├®ter les infos manquantes lors de la cr├®ation de contrat */}
       <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 ${showContratForm ? '' : 'hidden'}`}>
         <div className="bg-white rounded-lg p-6 max-w-md w-full">
-          <h2 className="text-lg font-bold mb-4">Compléter les informations manquantes</h2>
+          <h2 className="text-lg font-bold mb-4">Compl├®ter les informations manquantes</h2>
           <form onSubmit={e => {
             e.preventDefault();
             handleCreateContrat();
@@ -1943,10 +2120,10 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                 : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
             }`}
           >
-            {showArchived ? '👁️ Voir les RDV actifs' : '📦 Voir les RDV archivés'}
+            {showArchived ? '­ƒæü´©Å Voir les RDV actifs' : '­ƒôª Voir les RDV archiv├®s'}
           </button>
           <span className="text-sm text-gray-600 dark:text-gray-400">
-            {showArchived ? `${filteredRdv.length} RDV archivé(s)` : `${filteredRdv.length} RDV actif(s)`}
+            {showArchived ? `${filteredRdv.length} RDV archiv├®(s)` : `${filteredRdv.length} RDV actif(s)`}
           </span>
         </div>
       </div>
