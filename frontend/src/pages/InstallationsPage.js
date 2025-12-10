@@ -130,6 +130,17 @@ const InstallationsPage = () => {
     }
   };
 
+  const handleDelete = async (id) => {
+    try {
+      await axios.delete(`http://localhost:4000/api/rendez-vous/${id}`);
+      alert("✅ Rendez-vous supprimé !");
+      fetchRendezvous();
+    } catch (error) {
+      console.error("Erreur:", error);
+      alert("Erreur lors de la suppression");
+    }
+  };
+
   const getTodayDate = () => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -244,6 +255,10 @@ const InstallationsPage = () => {
             onCreateRdv={() => setShowQuickAddModal(true)}
             sortOptions={[{ value: 'date', label: 'Date' }, { value: 'nom', label: 'Nom' }]}
             onSortChange={setSortOption}
+            onEffectue={handleMarkEffectue}
+            onFacturer={handleMarkFacture}
+            onEdit={(rdv) => navigate('/installations/suivi', { state: { editRdv: rdv } })}
+            onDelete={(rdv) => window.confirm(`Supprimer le RDV de ${rdv.cabinet} ?`) && handleDelete(rdv.id_rdv)}
           />
         </div>
 
