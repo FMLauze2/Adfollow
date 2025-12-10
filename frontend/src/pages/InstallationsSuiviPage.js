@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import axios from "axios";
 import { getChecklistForType, getChecklistProgress } from "../utils/checklists";
 import ImportICS from "../components/ImportICS";
@@ -6,6 +7,7 @@ import RechercheAvanceeRDV from "../components/RechercheAvanceeRDV";
 // Modale InfosManquantesModal intégrée localement, pas d'import nécessaire
 
 const InstallationsSuiviPage = ({ onRetour }) => {
+    const location = useLocation();
     const [sortOption, setSortOption] = useState("date_desc");
     const [showForm, setShowForm] = useState(false);
     // ...existing code...
@@ -104,6 +106,16 @@ const InstallationsSuiviPage = ({ onRetour }) => {
   useEffect(() => {
     fetchRendezvous();
   }, [showArchived]);
+
+  // Gérer l'ouverture du formulaire de modification depuis la navigation
+  useEffect(() => {
+    if (location.state?.editRdv) {
+      const rdv = location.state.editRdv;
+      handleEdit(rdv);
+      // Nettoyer le state pour éviter de rouvrir à chaque render
+      window.history.replaceState({}, '');
+    }
+  }, [location.state]);
 
   // Gérer l'ouverture du modal depuis le calendrier
   useEffect(() => {
