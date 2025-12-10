@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/Api';
 import InstallationsSuiviPage from './InstallationsSuiviPage';
 import RechercheSimpleRDV from '../components/RechercheSimpleRDV';
 import { useNavigate } from "react-router-dom";
+import { showSuccess, showError } from '../utils/toast';
+import { getCachedRdv, setCachedRdv } from '../services/rdvCache';
 
 const InstallationsPage = () => {
     const [sortOption, setSortOption] = useState("date_desc");
@@ -34,6 +36,14 @@ const InstallationsPage = () => {
       }
       return sorted;
     };
+
+    const applyOptimisticUpdate = (id, updates) => {
+      setRendezvous((prev) => prev.map((rdv) => rdv.id_rdv === id ? { ...rdv, ...updates } : rdv));
+    };
+
+    const removeOptimistic = (id) => {
+      setRendezvous((prev) => prev.filter((rdv) => rdv.id_rdv !== id));
+    };
   const [showAdvancedMode, setShowAdvancedMode] = useState(false);
   const [rendezvous, setRendezvous] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -57,11 +67,23 @@ const InstallationsPage = () => {
     fetchRendezvous();
   }, []);
 
-  const fetchRendezvous = async () => {
+  const fetchRendezvous = async (force = false) => {
     setLoading(true);
     try {
-      const response = await axios.get("http://localhost:4000/api/rendez-vous");
-      setRendezvous(response.data || []);
+      const cacheKey = 'rdv_simple_all';
+      if (!force) {
+        const cached = getCachedRdv(cacheKey);
+        if (cached) {
+          setRendezvous(cached);
+          setLoading(false);
+          return;
+        }
+      }
+
+      const response = await api.get("/rendez-vous");
+      const data = response.data || [];
+      setCachedRdv(cacheKey, data);
+      setRendezvous(data);
     } catch (error) {
       console.error("Erreur chargement RDV:", error);
     } finally {
@@ -89,7 +111,7 @@ const InstallationsPage = () => {
     const typeNeedsPraticiens = ["Installation serveur", "Formation", "Démo"];
     if (typeNeedsPraticiens.includes(rdv.type_rdv)) {
       if (!rdv.praticiens || rdv.praticiens.length === 0) {
-        alert("❌ Vous devez renseigner au moins un praticien.\n\nUtilisez la gestion avancée pour ajouter les praticiens.");
+        showError("Ajoutez au moins un praticien (gestion avancée si besoin)");
         return;
       }
     }
@@ -97,47 +119,56 @@ const InstallationsPage = () => {
     // Validation email pour Installation serveur
     if (rdv.type_rdv === "Installation serveur") {
       if (!rdv.email || rdv.email.trim() === "") {
-        alert("❌ Vous devez renseigner l'email du cabinet.\n\nUtilisez la gestion avancée pour ajouter l'email.");
+        showError("Renseignez l'email du cabinet (gestion avancée)");
         return;
       }
     }
 
     if (!window.confirm(`Marquer "${rdv.cabinet}" comme effectué ?`)) return;
 
+    const previous = rendezvous;
+    applyOptimisticUpdate(rdv.id_rdv, { statut: 'Effectué' });
     try {
-      await axios.post(`http://localhost:4000/api/rendez-vous/${rdv.id_rdv}/complete`);
-      alert("✅ RDV marqué comme effectué !");
-      fetchRendezvous();
+      await api.post(`/rendez-vous/${rdv.id_rdv}/complete`);
+      showSuccess("RDV marqué comme effectué");
+      fetchRendezvous(true);
     } catch (error) {
       console.error("Erreur:", error);
-      alert("Erreur lors de la mise à jour");
+      showError("Erreur lors de la mise à jour");
+      setRendezvous(previous);
     }
   };
 
   const handleMarkFacture = async (rdv) => {
     if (!window.confirm(`Marquer "${rdv.cabinet}" comme facturé ?`)) return;
 
+    const previous = rendezvous;
+    applyOptimisticUpdate(rdv.id_rdv, { statut: 'Facturé' });
     try {
-      await axios.put(`http://localhost:4000/api/rendez-vous/${rdv.id_rdv}`, {
+      await api.put(`/rendez-vous/${rdv.id_rdv}`, {
         ...rdv,
         statut: 'Facturé'
       });
-      alert("✅ RDV marqué comme facturé !");
-      fetchRendezvous();
+      showSuccess("RDV marqué comme facturé");
+      fetchRendezvous(true);
     } catch (error) {
       console.error("Erreur:", error);
-      alert("Erreur lors de la mise à jour");
+      showError("Erreur lors de la mise à jour");
+      setRendezvous(previous);
     }
   };
 
   const handleDelete = async (id) => {
+    const previous = rendezvous;
+    removeOptimistic(id);
     try {
-      await axios.delete(`http://localhost:4000/api/rendez-vous/${id}`);
-      alert("✅ Rendez-vous supprimé !");
-      fetchRendezvous();
+      await api.delete(`/rendez-vous/${id}`);
+      showSuccess("Rendez-vous supprimé");
+      fetchRendezvous(true);
     } catch (error) {
       console.error("Erreur:", error);
-      alert("Erreur lors de la suppression");
+      showError("Erreur lors de la suppression");
+      setRendezvous(previous);
     }
   };
 
@@ -175,12 +206,12 @@ const InstallationsPage = () => {
     e.preventDefault();
     
     if (!quickForm.cabinet || !quickForm.date_rdv || !quickForm.heure_rdv || !quickForm.ville) {
-      alert('Veuillez remplir tous les champs obligatoires');
+      showError('Veuillez remplir tous les champs obligatoires');
       return;
     }
 
     try {
-      await axios.post("http://localhost:4000/api/rendez-vous", {
+      await api.post("/rendez-vous", {
         ...quickForm,
         praticiens: quickForm.praticiens
           ? quickForm.praticiens.split(',').map(p => {
@@ -191,7 +222,7 @@ const InstallationsPage = () => {
         statut: 'Planifié'
       });
       
-      alert('✅ Rendez-vous créé !');
+      showSuccess('Rendez-vous créé');
       setShowQuickAddModal(false);
       setQuickForm({
         cabinet: '',
@@ -201,10 +232,10 @@ const InstallationsPage = () => {
         ville: '',
         code_postal: ''
       });
-      fetchRendezvous();
+      fetchRendezvous(true);
     } catch (error) {
       console.error('Erreur création RDV:', error);
-      alert('❌ Erreur lors de la création');
+      showError('Erreur lors de la création');
     }
   };
 
@@ -252,6 +283,7 @@ const InstallationsPage = () => {
         <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
           <RechercheSimpleRDV
             rdvList={rendezvous}
+            loading={loading}
             onCreateRdv={() => setShowQuickAddModal(true)}
             sortOptions={[{ value: 'date', label: 'Date' }, { value: 'nom', label: 'Nom' }]}
             onSortChange={setSortOption}

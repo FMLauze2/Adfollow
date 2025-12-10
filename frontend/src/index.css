@@ -11,6 +11,15 @@
   --text-secondary: #6b7280;
   --border-color: #e5e7eb;
   --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  --focus-ring: #2563eb;
+  --status-planifie-bg: #dbeafe;
+  --status-planifie-text: #1e3a8a;
+  --status-effectue-bg: #dcfce7;
+  --status-effectue-text: #166534;
+  --status-facture-bg: #f3e8ff;
+  --status-facture-text: #6b21a8;
+  --status-annule-bg: #fee2e2;
+  --status-annule-text: #991b1b;
 }
 
 body.dark-mode {
@@ -21,8 +30,22 @@ body.dark-mode {
   --text-secondary: #d1d5db;
   --border-color: #4b5563;
   --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.5);
+  --focus-ring: #60a5fa;
+  --status-planifie-bg: #1e3a8a;
+  --status-planifie-text: #e0f2fe;
+  --status-effectue-bg: #14532d;
+  --status-effectue-text: #dcfce7;
+  --status-facture-bg: #4c1d95;
+  --status-facture-text: #f3e8ff;
+  --status-annule-bg: #7f1d1d;
+  --status-annule-text: #fee2e2;
   background-color: var(--bg-primary);
   color: var(--text-primary);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 /* Styles globaux pour le mode sombre */

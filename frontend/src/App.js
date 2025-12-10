@@ -6,6 +6,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { useTheme } from "./contexts/ThemeContext";
 import Navbar from "./components/Navbar";
+import ToastContainer from "./components/ToastContainer";
 import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
 import ContratFormPage from "./pages/ContratFormPage";
@@ -83,6 +84,7 @@ function AppContent() {
 
   return (
     <>
+      <ToastContainer />
       {isAuthenticated() && <Navbar />}
       <div style={{ padding: isAuthenticated() ? "20px" : "0", minHeight: "calc(100vh - 140px)" }}>
         <Routes>
