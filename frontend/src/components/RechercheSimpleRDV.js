@@ -5,7 +5,7 @@ import { formatDate } from '../utils/format';
 // Ce composant gère la recherche rapide et l'affichage simple des RDV
 const RechercheSimpleRDV = ({ rdvList, onCreateRdv, sortOptions, onSortChange, onEffectue, onFacturer, onEdit, onDelete, loading = false }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortType, setSortType] = useState(sortOptions[0]?.value || 'date');
+  const [sortType, setSortType] = useState(sortOptions[0]?.value || 'date_desc');
   const [debouncedTerm, setDebouncedTerm] = useState('');
 
   // Persistance du filtre
@@ -40,13 +40,30 @@ const RechercheSimpleRDV = ({ rdvList, onCreateRdv, sortOptions, onSortChange, o
   }), [rdvList, debouncedTerm]);
 
   // Tri des RDV selon le type choisi
+  const getDateValue = (value) => {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? 0 : d.getTime();
+  };
+
   const sortedRdv = [...filteredRdv].sort((a, b) => {
-    if (sortType === 'date') {
-      return new Date(b.date_rdv) - new Date(a.date_rdv);
-    } else if (sortType === 'nom') {
-      return (a.cabinet || '').localeCompare(b.cabinet || '');
+    switch (sortType) {
+      case 'date_desc':
+        return getDateValue(b.date_rdv) - getDateValue(a.date_rdv);
+      case 'date_asc':
+        return getDateValue(a.date_rdv) - getDateValue(b.date_rdv);
+      case 'creation_desc':
+        return getDateValue(b.date_creation || b.created_at) - getDateValue(a.date_creation || a.created_at);
+      case 'creation_asc':
+        return getDateValue(a.date_creation || a.created_at) - getDateValue(b.date_creation || b.created_at);
+      case 'cabinet_az':
+        return (a.cabinet || '').localeCompare(b.cabinet || '');
+      case 'cabinet_za':
+        return (b.cabinet || '').localeCompare(a.cabinet || '');
+      case 'statut':
+        return (a.statut || '').localeCompare(b.statut || '');
+      default:
+        return 0;
     }
-    return 0;
   });
 
   return (

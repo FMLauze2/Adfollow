@@ -50,6 +50,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const rdvPerPage = 10;
   const [infosManquantesModal, setInfosManquantesModal] = useState({ open: false, rdv: null });
+  const [sortOption, setSortOption] = useState("date_desc");
 
   const fetchRendezvous = async (force = false) => {
     setLoading(true);
@@ -772,6 +773,46 @@ const InstallationsSuiviPage = ({ onRetour }) => {
     return matchesSearch && matchesStatus && matchesType;
   });
 
+  const sortRdv = (list) => {
+    const getDateValue = (value) => {
+      const d = new Date(value);
+      return Number.isNaN(d.getTime()) ? 0 : d.getTime();
+    };
+
+    const sorted = [...list];
+    switch (sortOption) {
+      case "date_desc":
+        sorted.sort((a, b) => getDateValue(b.date_rdv) - getDateValue(a.date_rdv));
+        break;
+      case "date_asc":
+        sorted.sort((a, b) => getDateValue(a.date_rdv) - getDateValue(b.date_rdv));
+        break;
+      case "creation_desc":
+        sorted.sort((a, b) => getDateValue(b.date_creation || b.created_at) - getDateValue(a.date_creation || a.created_at));
+        break;
+      case "creation_asc":
+        sorted.sort((a, b) => getDateValue(a.date_creation || a.created_at) - getDateValue(b.date_creation || b.created_at));
+        break;
+      case "cabinet_az":
+        sorted.sort((a, b) => (a.cabinet || "").localeCompare(b.cabinet || ""));
+        break;
+      case "cabinet_za":
+        sorted.sort((a, b) => (b.cabinet || "").localeCompare(a.cabinet || ""));
+        break;
+      case "statut":
+        sorted.sort((a, b) => (a.statut || "").localeCompare(b.statut || ""));
+        break;
+      case "type":
+        sorted.sort((a, b) => (a.type_rdv || "").localeCompare(b.type_rdv || ""));
+        break;
+      default:
+        break;
+    }
+    return sorted;
+  };
+
+  const sortedRdv = sortRdv(filteredRdv);
+
   // Nouvelle fonction pour vérifier et compléter les infos avant création de contrat
   const handleCreateContratWithCheck = async (rdv, prix) => {
     // Vérifie les champs obligatoires
@@ -965,6 +1006,20 @@ const InstallationsSuiviPage = ({ onRetour }) => {
           <option value="Démo">Démo</option>
           <option value="Mise à jour">Mise à jour</option>
           <option value="Autre">Autre</option>
+        </select>
+        <select
+          value={sortOption}
+          onChange={(e) => setSortOption(e.target.value)}
+          className="border px-4 py-2 rounded"
+        >
+          <option value="date_desc">Date du RDV ↓</option>
+          <option value="date_asc">Date du RDV ↑</option>
+          <option value="creation_desc">Création ↓</option>
+          <option value="creation_asc">Création ↑</option>
+          <option value="cabinet_az">Cabinet A→Z</option>
+          <option value="cabinet_za">Cabinet Z→A</option>
+          <option value="statut">Statut</option>
+          <option value="type">Type</option>
         </select>
       </div>
 
@@ -1166,7 +1221,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
       ) : (
         <>
         <div className="grid gap-4">
-          {filteredRdv.slice((currentPage - 1) * rdvPerPage, currentPage * rdvPerPage).map(rdv => (
+          {sortedRdv.slice((currentPage - 1) * rdvPerPage, currentPage * rdvPerPage).map(rdv => (
             <div 
               key={rdv.id_rdv} 
               className={`border rounded-lg p-4 shadow ${
@@ -1377,13 +1432,13 @@ const InstallationsSuiviPage = ({ onRetour }) => {
               </div>
             </div>
           ))}
-          {filteredRdv.length === 0 && (
+          {sortedRdv.length === 0 && (
             <p className="text-gray-500 text-center py-8">Aucun rendez-vous trouvé</p>
           )}
         </div>
         
         {/* Pagination */}
-        {filteredRdv.length > rdvPerPage && (
+        {sortedRdv.length > rdvPerPage && (
           <div className="mt-6 flex items-center justify-center gap-4">
             <button
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
@@ -1393,11 +1448,11 @@ const InstallationsSuiviPage = ({ onRetour }) => {
               ← Précédent
             </button>
             <span className="text-sm font-medium text-gray-700">
-              Page {currentPage} / {Math.ceil(filteredRdv.length / rdvPerPage)}
+              Page {currentPage} / {Math.ceil(sortedRdv.length / rdvPerPage)}
             </span>
             <button
-              onClick={() => setCurrentPage(Math.min(Math.ceil(filteredRdv.length / rdvPerPage), currentPage + 1))}
-              disabled={currentPage === Math.ceil(filteredRdv.length / rdvPerPage)}
+              onClick={() => setCurrentPage(Math.min(Math.ceil(sortedRdv.length / rdvPerPage), currentPage + 1))}
+              disabled={currentPage === Math.ceil(sortedRdv.length / rdvPerPage)}
               className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded"
             >
               Suivant →
@@ -1946,7 +2001,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
             {showArchived ? '👁️ Voir les RDV actifs' : '📦 Voir les RDV archivés'}
           </button>
           <span className="text-sm text-gray-600 dark:text-gray-400">
-            {showArchived ? `${filteredRdv.length} RDV archivé(s)` : `${filteredRdv.length} RDV actif(s)`}
+            {showArchived ? `${sortedRdv.length} RDV archivé(s)` : `${sortedRdv.length} RDV actif(s)`}
           </span>
         </div>
       </div>

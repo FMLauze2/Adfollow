@@ -285,7 +285,15 @@ const InstallationsPage = () => {
             rdvList={rendezvous}
             loading={loading}
             onCreateRdv={() => setShowQuickAddModal(true)}
-            sortOptions={[{ value: 'date', label: 'Date' }, { value: 'nom', label: 'Nom' }]}
+            sortOptions={[
+              { value: 'date_desc', label: 'Date du RDV ↓' },
+              { value: 'date_asc', label: 'Date du RDV ↑' },
+              { value: 'creation_desc', label: 'Création ↓' },
+              { value: 'creation_asc', label: 'Création ↑' },
+              { value: 'cabinet_az', label: 'Cabinet A→Z' },
+              { value: 'cabinet_za', label: 'Cabinet Z→A' },
+              { value: 'statut', label: 'Statut' },
+            ]}
             onSortChange={setSortOption}
             onEffectue={handleMarkEffectue}
             onFacturer={handleMarkFacture}
