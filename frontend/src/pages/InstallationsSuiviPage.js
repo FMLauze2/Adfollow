@@ -102,31 +102,44 @@ const InstallationsSuiviPage = ({ onRetour }) => {
   }, [searchTerm, statusFilter, typeFilter, showArchived]);
 
   useEffect(() => {
-    if (treatmentModalRdv) {
-      let parsedSpecificFields = {};
-      let parsedNotes = "";
-      let savedChecklist = [];
+    if (!treatmentModalRdv) return;
 
-      try {
-        const notesData = JSON.parse(treatmentModalRdv.notes || "{}");
-        parsedSpecificFields = notesData.specificFields || {};
-        parsedNotes = notesData.generalNotes || "";
-        savedChecklist = notesData.checklist || [];
-      } catch {
-        parsedNotes = treatmentModalRdv.notes || "";
-      }
+    let parsedSpecificFields = {};
+    let parsedNotes = "";
+    let savedChecklist = [];
+    let parsedPraticiens = [];
 
-      const baseChecklist = getChecklistForType(treatmentModalRdv.type_rdv);
-      const checklist = savedChecklist.length > 0 ? savedChecklist : baseChecklist;
-
-      setTreatmentForm({
-        specificFields: parsedSpecificFields,
-        praticiens: treatmentModalRdv.praticiens || [],
-        notes: parsedNotes,
-        checklist: checklist
-      });
+    try {
+      const notesData = JSON.parse(treatmentModalRdv.notes || "{}");
+      parsedSpecificFields = notesData.specificFields || {};
+      parsedNotes = notesData.generalNotes || "";
+      savedChecklist = notesData.checklist || [];
+    } catch {
+      parsedNotes = treatmentModalRdv.notes || "";
     }
-  }, [treatmentModalRdv]);
+
+    // Normaliser les praticiens (peut être stocké en string JSON)
+    if (Array.isArray(treatmentModalRdv.praticiens)) {
+      parsedPraticiens = treatmentModalRdv.praticiens;
+    } else if (typeof treatmentModalRdv.praticiens === "string") {
+      try {
+        const asArray = JSON.parse(treatmentModalRdv.praticiens);
+        parsedPraticiens = Array.isArray(asArray) ? asArray : [];
+      } catch {
+        parsedPraticiens = [];
+      }
+    }
+
+    const baseChecklist = getChecklistForType(treatmentModalRdv.type_rdv);
+    const checklist = savedChecklist.length > 0 ? savedChecklist : baseChecklist;
+
+    setTreatmentForm({
+      specificFields: parsedSpecificFields,
+      praticiens: parsedPraticiens,
+      notes: parsedNotes,
+      checklist: checklist
+    });
+  }, [treatmentModalRdv?.id_rdv, treatmentModalRdv?.notes, treatmentModalRdv?.praticiens, treatmentModalRdv?.type_rdv]);
 
   const handleArchiveRdv = async (idRdv) => {
     if (!window.confirm("Archiver ce rendez-vous ? Il sera masqué de la vue principale.")) return;
@@ -362,19 +375,33 @@ const InstallationsSuiviPage = ({ onRetour }) => {
   const handleComplete = async (rdv) => {
     // Validation praticiens pour les installations
     const typeNeedsPraticiens = ["Installation serveur", "Formation", "Démo"];
-        if (typeNeedsPraticiens.includes(rdv.type_rdv)) {
-          if (!Array.isArray(rdv.praticiens) || rdv.praticiens.length === 0) {
-            showError("Ajoutez au moins un praticien avant de marquer comme effectué.");
-            return;
-          }
-        }
+
+    // Normaliser praticiens (peut être une string JSON)
+    let praticiensParsed = [];
+    if (Array.isArray(rdv.praticiens)) {
+      praticiensParsed = rdv.praticiens;
+    } else if (typeof rdv.praticiens === "string") {
+      try {
+        const parsed = JSON.parse(rdv.praticiens);
+        praticiensParsed = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        praticiensParsed = [];
+      }
+    }
+
+    if (typeNeedsPraticiens.includes(rdv.type_rdv)) {
+      if (!praticiensParsed || praticiensParsed.length === 0) {
+        showError("Ajoutez au moins un praticien avant de marquer comme effectué.");
+        return;
+      }
+    }
         
-        // Validation email obligatoire pour Installation serveur
-        if (rdv.type_rdv === "Installation serveur") {
-          if (!rdv.email || typeof rdv.email !== "string" || rdv.email.trim() === "") {
-            showError("Renseignez l'email du cabinet avant de marquer comme effectué.");
-            return;
-          }
+    // Validation email obligatoire pour Installation serveur
+    if (rdv.type_rdv === "Installation serveur") {
+      if (!rdv.email || typeof rdv.email !== "string" || rdv.email.trim() === "") {
+        showError("Renseignez l'email du cabinet avant de marquer comme effectué.");
+        return;
+      }
     }
     
     try {
@@ -393,12 +420,25 @@ const InstallationsSuiviPage = ({ onRetour }) => {
   };
 
   const handleFacturer = async (id) => {
+    let praticiensParsed = [];
     // Trouver le RDV pour validation
     const rdv = rendezvous.find(r => r.id_rdv === id);
     if (rdv) {
+      // Normaliser les praticiens (peuvent être stockés en JSON string)
+      if (Array.isArray(rdv.praticiens)) {
+        praticiensParsed = rdv.praticiens;
+      } else if (typeof rdv.praticiens === "string") {
+        try {
+          const parsed = JSON.parse(rdv.praticiens);
+          praticiensParsed = Array.isArray(parsed) ? parsed : [];
+        } catch {
+          praticiensParsed = [];
+        }
+      }
+
       const typeNeedsPraticiens = ["Installation serveur", "Formation", "Démo"];
       if (typeNeedsPraticiens.includes(rdv.type_rdv)) {
-        if (!rdv.praticiens || rdv.praticiens.length === 0) {
+        if (!praticiensParsed || praticiensParsed.length === 0) {
           showError("Ajoutez au moins un praticien avant de facturer.");
           return;
         }
@@ -430,6 +470,11 @@ const InstallationsSuiviPage = ({ onRetour }) => {
     if (!window.confirm("Marquer ce rendez-vous comme facturé ?")) return;
     
     try {
+      // S'assurer que les praticiens sont bien enregistrés avant facturation
+      if (rdv) {
+        await api.put(`/rendez-vous/${id}`, { praticiens: praticiensParsed });
+      }
+
       await api.post(`/rendez-vous/${id}/facturer`);
       showSuccess("Rendez-vous marqué comme facturé");
       fetchRendezvous(true);
@@ -1376,7 +1421,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                       </button>
                     </>
                   )}
-                  {rdv.id_contrat && (
+                  {rdv.id_contrat ? (
                     <button
                       onClick={() => handleRegenerateContrat(rdv)}
                       className="bg-pink-500 text-white px-3 py-1 rounded text-sm hover:bg-pink-600"
@@ -1384,6 +1429,20 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                     >
                       🔄 Régénérer contrat
                     </button>
+                  ) : (
+                    rdv.statut === "Facturé" && rdv.type_rdv === "Installation serveur" && (
+                      <button
+                        onClick={async () => {
+                          const prix = prompt("Prix du contrat (€) :");
+                          if (!prix || parseFloat(prix) <= 0) return;
+                          await handleCreateContratWithCheck(rdv, prix);
+                        }}
+                        className="bg-pink-500 text-white px-3 py-1 rounded text-sm hover:bg-pink-600"
+                        title="Créer le contrat de service pour cette installation"
+                      >
+                        📄 Générer contrat
+                      </button>
+                    )
                   )}
                   <button
                     onClick={() => setTreatmentModalRdv(rdv)}

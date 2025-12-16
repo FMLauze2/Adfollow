@@ -9,6 +9,10 @@ frontend/build/
 
 # IDE
 .vscode/
+.vscode/settings.json
+
+# PDF/contrats générés (potentiellement sensibles)
+backend/services/pdf/uploads/contrats/debug/
 
 # Backend scripts (outils de développement)
 backend/scripts/

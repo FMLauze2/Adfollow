@@ -193,15 +193,17 @@ function NotificationBell() {
                     key={notif.id_notification}
                     className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition"
                     onClick={() => {
-                      // Ne pas marquer comme lue si c'est une notification persistante
-                      if (notif.type_notification !== 'facturation' && 
-                          notif.type_notification !== 'contrat_manquant' && 
-                          notif.type_notification !== 'daily_manquant') {
-                        markAsRead(notif.id_notification);
-                      }
-                      // Rediriger vers daily reports si c'est une notif daily manquant
                       if (notif.type_notification === 'daily_manquant') {
+                        // Dès que le daily est complété, on laisse l'utilisateur vider la notif
+                        markAsRead(notif.id_notification);
                         window.location.href = '/dailyreports';
+                        return;
+                      }
+
+                      // Ne pas auto-marquer les notifs persistantes (facturation / contrat)
+                      if (notif.type_notification !== 'facturation' && 
+                          notif.type_notification !== 'contrat_manquant') {
+                        markAsRead(notif.id_notification);
                       }
                     }}
                   >

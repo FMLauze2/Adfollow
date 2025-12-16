@@ -4,7 +4,11 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'votre_secret_jwt_a_changer_en_production';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  console.warn('[auth] JWT_SECRET manquant : définissez la variable d\'environnement pour sécuriser les tokens');
+}
 const JWT_EXPIRES_IN = '24h';
 
 // Login
