@@ -8,6 +8,20 @@ function CalendrierPage() {
   const [selectedRdv, setSelectedRdv] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [draggedRdv, setDraggedRdv] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newRdv, setNewRdv] = useState({
+    cabinet: '',
+    date_rdv: '',
+    heure_rdv: '',
+    type_rdv: 'Installation serveur',
+    ville: '',
+    code_postal: '',
+    adresse: '',
+    email: '',
+    telephone: '',
+    praticiens: '',
+    notes: ''
+  });
   
   // Todo list
   const [selectedDate, setSelectedDate] = useState(null);
@@ -241,6 +255,21 @@ function CalendrierPage() {
           
           <div className="flex gap-3">
             <button
+              onClick={() => {
+                // Pré-remplir la date si une case est déjà sélectionnée
+                setNewRdv(prev => ({
+                  ...prev,
+                  date_rdv: selectedDate
+                    ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
+                    : prev.date_rdv
+                }));
+                setShowCreateModal(true);
+              }}
+              className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition flex items-center gap-2"
+            >
+              ➕ Nouveau RDV
+            </button>
+            <button
               onClick={previousMonth}
               className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
             >
@@ -337,7 +366,10 @@ function CalendrierPage() {
                         {rdv.archive && <span>📦</span>}
                         {rdv.heure_rdv}
                       </div>
-                      <div className="truncate">{rdv.cabinet}</div>
+                      <div className="truncate">
+                        {rdv.cabinet}
+                        {rdv.type_rdv ? ` · ${rdv.type_rdv}` : ''}
+                      </div>
                     </div>
                   ))}
                   
@@ -514,8 +546,14 @@ function CalendrierPage() {
             </div>
 
             <div className="space-y-3">
-              <div>
-                <span className="font-semibold">Cabinet:</span> {selectedRdv.cabinet}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold">Cabinet:</span>
+                <span>{selectedRdv.cabinet}</span>
+                {selectedRdv.type_rdv && (
+                  <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded">
+                    {selectedRdv.type_rdv}
+                  </span>
+                )}
               </div>
               <div>
                 <span className="font-semibold">Date:</span> {new Date(selectedRdv.date_rdv).toLocaleDateString('fr-FR')}
@@ -567,6 +605,201 @@ function CalendrierPage() {
                 Fermer
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal création RDV */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowCreateModal(false)}>
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between p-6 border-b">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">➕ Nouveau rendez-vous</h2>
+                <p className="text-sm text-gray-600">Ajoutez un RDV sans quitter le calendrier.</p>
+              </div>
+              <button onClick={() => setShowCreateModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+            </div>
+
+            <form
+              className="p-6 space-y-4"
+              onSubmit={async (e) => {
+                e.preventDefault();
+
+                if (!newRdv.cabinet || !newRdv.date_rdv || !newRdv.heure_rdv || !newRdv.ville) {
+                  alert('Veuillez renseigner cabinet, date, heure et ville');
+                  return;
+                }
+
+                try {
+                  const payload = {
+                    ...newRdv,
+                    praticiens: newRdv.praticiens
+                      ? newRdv.praticiens.split(',').map(p => {
+                          const [prenom, nom] = p.trim().split(' ');
+                          return { prenom: prenom || '', nom: nom || '' };
+                        })
+                      : [],
+                    statut: 'Planifié'
+                  };
+
+                  await axios.post('http://localhost:4000/api/rendez-vous', payload);
+                  await fetchRdv();
+                  alert('Rendez-vous créé');
+                  setShowCreateModal(false);
+                  setNewRdv({
+                    cabinet: '',
+                    date_rdv: '',
+                    heure_rdv: '',
+                    type_rdv: 'Installation serveur',
+                    ville: '',
+                    code_postal: '',
+                    adresse: '',
+                    email: '',
+                    telephone: '',
+                    praticiens: '',
+                    notes: ''
+                  });
+                } catch (error) {
+                  console.error('Erreur création RDV:', error);
+                  alert('Erreur lors de la création du RDV');
+                }
+              }}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cabinet *</label>
+                  <input
+                    type="text"
+                    value={newRdv.cabinet}
+                    onChange={(e) => setNewRdv({...newRdv, cabinet: e.target.value})}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Type *</label>
+                  <select
+                    value={newRdv.type_rdv}
+                    onChange={(e) => setNewRdv({...newRdv, type_rdv: e.target.value})}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                  >
+                    <option value="Installation serveur">Installation serveur</option>
+                    <option value="Installation poste secondaire">Installation poste secondaire</option>
+                    <option value="Changement de poste serveur">Changement de poste serveur</option>
+                    <option value="Formation">Formation</option>
+                    <option value="Export BDD">Export BDD</option>
+                    <option value="Démo">Démo</option>
+                    <option value="Mise à jour">Mise à jour</option>
+                    <option value="Autre">Autre</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
+                  <input
+                    type="date"
+                    value={newRdv.date_rdv}
+                    onChange={(e) => setNewRdv({...newRdv, date_rdv: e.target.value})}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Heure *</label>
+                  <input
+                    type="time"
+                    value={newRdv.heure_rdv}
+                    onChange={(e) => setNewRdv({...newRdv, heure_rdv: e.target.value})}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Adresse</label>
+                  <input
+                    type="text"
+                    value={newRdv.adresse}
+                    onChange={(e) => setNewRdv({...newRdv, adresse: e.target.value})}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Code postal</label>
+                    <input
+                      type="text"
+                      value={newRdv.code_postal}
+                      onChange={(e) => setNewRdv({...newRdv, code_postal: e.target.value})}
+                      className="w-full border border-gray-300 rounded px-3 py-2"
+                      maxLength="5"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ville *</label>
+                    <input
+                      type="text"
+                      value={newRdv.ville}
+                      onChange={(e) => setNewRdv({...newRdv, ville: e.target.value})}
+                      className="w-full border border-gray-300 rounded px-3 py-2"
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={newRdv.email}
+                    onChange={(e) => setNewRdv({...newRdv, email: e.target.value})}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
+                  <input
+                    type="tel"
+                    value={newRdv.telephone}
+                    onChange={(e) => setNewRdv({...newRdv, telephone: e.target.value})}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Praticiens (séparés par virgule)</label>
+                  <input
+                    type="text"
+                    value={newRdv.praticiens}
+                    onChange={(e) => setNewRdv({...newRdv, praticiens: e.target.value})}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                    placeholder="Jean Dupont, Marie Martin"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                  <textarea
+                    value={newRdv.notes}
+                    onChange={(e) => setNewRdv({...newRdv, notes: e.target.value})}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                    rows="3"
+                  ></textarea>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 bg-white text-gray-700 hover:bg-gray-100 border rounded-lg"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                >
+                  Créer le RDV
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -633,7 +866,14 @@ function CalendrierPage() {
                           )}
                         </div>
                       </div>
-                      <div className="font-semibold mb-1" style={{color: '#1F2937'}}>{rdv.cabinet}</div>
+                      <div className="font-semibold mb-1 flex flex-wrap items-center gap-1" style={{color: '#1F2937'}}>
+                        <span className="truncate">{rdv.cabinet}</span>
+                        {rdv.type_rdv && (
+                          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
+                            {rdv.type_rdv}
+                          </span>
+                        )}
+                      </div>
                       {(rdv.adresse || rdv.ville) && (
                         <div className="text-sm" style={{color: '#4B5563'}}>📍 {rdv.adresse}, {rdv.code_postal} {rdv.ville}</div>
                       )}
