@@ -485,6 +485,7 @@ PT - Paul Tremblay
                 reportId={editingReport?.id_report}
                 onSave={(data) => setAvancements(data)}
                 initialData={avancements}
+                key={`${form.date_report}-${editingReport?.id_report || 'new'}`}
               />
             </div>
 
