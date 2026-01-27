@@ -4,14 +4,26 @@ const router = express.Router();
 const pool = require('../db');
 const { generateContratPDF } = require('../services/pdf/generateContratPDF');
 
-
+// Fonction utilitaire pour parser les praticiens (JSONB -> array)
+const parsePraticiens = (contrat) => {
+  if (!contrat) return contrat;
+  let praticiens = contrat.praticiens;
+  if (typeof praticiens === 'string') {
+    try {
+      praticiens = JSON.parse(praticiens);
+    } catch (e) {
+      praticiens = [];
+    }
+  }
+  return { ...contrat, praticiens: Array.isArray(praticiens) ? praticiens : [] };
+};
 
 // GET all contrats
 router.get('/', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM contrats ORDER BY id_contrat');
     
-    // Ajouter le statut calculé à chaque contrat
+    // Ajouter le statut calculé à chaque contrat + parser les praticiens
     const contratsAvecStatut = result.rows.map(contrat => {
       let statut = 'Brouillon';
       if (contrat.date_reception) {
@@ -19,7 +31,7 @@ router.get('/', async (req, res) => {
       } else if (contrat.date_envoi) {
         statut = 'Envoyé';
       }
-      return { ...contrat, statut };
+      return { ...parsePraticiens(contrat), statut };
     });
     
     res.json(contratsAvecStatut);
@@ -37,14 +49,14 @@ router.get('/', async (req, res) => {
       
       if (result.rows.length > 0) {
         const contrat = result.rows[0];
-        // Ajouter le statut calculé
+        // Ajouter le statut calculé + parser les praticiens
         let statut = 'Brouillon';
         if (contrat.date_reception) {
           statut = 'Reçu';
         } else if (contrat.date_envoi) {
           statut = 'Envoyé';
         }
-        res.json({ ...contrat, statut });
+        res.json({ ...parsePraticiens(contrat), statut });
       } else {
         res.status(404).json({ error: 'Contrat non trouvé' });
       }
@@ -86,7 +98,9 @@ router.get('/', async (req, res) => {
         // On continue quand même, PDF non critique
       }
 
-      res.json(contratCree);
+      // Parser les praticiens et ajouter le statut avant de renvoyer
+      const parsed = parsePraticiens(contratCree);
+      res.json({ ...parsed, statut: 'Brouillon' });
     } catch (err) {
       console.error(err.message);
       res.status(500).json({ message: 'Erreur lors de la création du contrat' });
@@ -209,7 +223,7 @@ router.put('/:id', async (req, res) => {
       statut = 'Envoyé';
     }
 
-    res.json({ ...contratModifie, statut });
+    res.json({ ...parsePraticiens(contratModifie), statut });
   } catch (err) {
     console.error('Erreur update contrat:', err);
     res.status(500).json({ error: 'Erreur lors de la mise à jour du contrat' });

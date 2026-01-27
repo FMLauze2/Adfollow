@@ -1,9 +1,43 @@
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer');
+const { generateContratPDFPython, checkPythonEnvironment } = require('./generateContratPDFPython');
 
-// Génère un PDF de contrat moderne, full HTML/CSS
+// Cache pour vérifier la disponibilité de Python
+let pythonAvailable = null;
+
+/**
+ * Génère un PDF de contrat - utilise Python en priorité, fallback vers Puppeteer
+ */
 async function generateContratPDF(contrat) {
+  // Vérifier si Python est disponible (cache le résultat)
+  if (pythonAvailable === null) {
+    pythonAvailable = await checkPythonEnvironment();
+    console.log(`Python environment disponible: ${pythonAvailable}`);
+  }
+  
+  // Essayer d'utiliser Python si disponible
+  if (pythonAvailable) {
+    try {
+      console.log('Génération PDF avec Python (meilleur rendu)...');
+      const pdfPath = await generateContratPDFPython(contrat);
+      console.log(`✓ PDF généré avec succès via Python: ${pdfPath}`);
+      return pdfPath;
+    } catch (pythonError) {
+      console.warn('⚠ Erreur génération PDF Python, fallback vers Puppeteer:', pythonError.message);
+      // Continuer avec Puppeteer
+    }
+  }
+  
+  // Fallback: utiliser Puppeteer (ancienne méthode)
+  console.log('Génération PDF avec Puppeteer (fallback)...');
+  return generateContratPDFPuppeteer(contrat);
+}
+
+/**
+ * Génère un PDF de contrat moderne, full HTML/CSS (ancienne méthode avec Puppeteer)
+ */
+async function generateContratPDFPuppeteer(contrat) {
     // Lecture et encodage de l'entête en base64
     let enteteBase64 = '';
     try {

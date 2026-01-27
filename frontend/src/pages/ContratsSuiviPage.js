@@ -8,13 +8,42 @@ const ContratsSuiviPage = ({ onRetour }) => {
 
   // Fonction pour formater les praticiens correctement
   const formatPraticiens = (praticiens) => {
-    if (!praticiens || !Array.isArray(praticiens)) return 'Aucun';
+    // Gérer les différents formats possibles
+    if (!praticiens) return 'Aucun';
     
-    return praticiens.map(p => {
+    // Si c'est une string JSON, la parser d'abord
+    let praticiensList = praticiens;
+    if (typeof praticiens === 'string') {
+      try {
+        praticiensList = JSON.parse(praticiens);
+      } catch (e) {
+        // Si c'est une simple string, la retourner
+        return praticiens || 'Aucun';
+      }
+    }
+    
+    // Vérifier que c'est un tableau
+    if (!Array.isArray(praticiensList)) {
+      // Si c'est un objet, convertir ses valeurs en array
+      if (typeof praticiensList === 'object') {
+        praticiensList = Object.values(praticiensList);
+      } else {
+        return 'Aucun';
+      }
+    }
+    
+    // Filtrer les éléments vides
+    if (praticiensList.length === 0) return 'Aucun';
+    
+    // Formater chaque praticien
+    return praticiensList.map(p => {
       if (typeof p === 'object' && p.prenom && p.nom) {
         return `${p.prenom} ${p.nom}`;
+      } else if (typeof p === 'object' && (p.nom || p.prenom)) {
+        // Concaténer nom et prenom s'ils existent
+        return [p.prenom, p.nom].filter(Boolean).join(' ');
       } else if (typeof p === 'string') {
-        return p;
+        return p.trim();
       }
       return '';
     }).filter(Boolean).join(', ') || 'Aucun';
@@ -319,7 +348,7 @@ const ContratsSuiviPage = ({ onRetour }) => {
     if (isRelance && hasDateEnvoi) {
       return `Bonjour,
 
-Je me permets de vous relancer concernant le contrat de services pour ${contrat.cabinet} que je vous ai envoyé il y a ${daysSinceEnvoi} jours.
+Je me permets de vous relancer concernant le contrat de services Médoc - ${contrat.cabinet} que je vous ai envoyé il y a ${daysSinceEnvoi} jours.
 
 À ce jour, je n'ai pas encore reçu le contrat signé et tamponné.
 
@@ -327,20 +356,18 @@ Pour rappel, voici les informations du contrat :
 - Cabinet : ${contrat.cabinet}
 - Adresse : ${contrat.adresse}, ${contrat.code_postal} ${contrat.ville}
 - Praticiens : ${formatPraticiens(contrat.praticiens)}
-- Montant : ${contrat.prix}€
 
 Merci de me retourner le contrat signé et tamponné par email dans les meilleurs délais.`;
     }
     
     return `Bonjour,
 
-Veuillez trouver ci-joint le contrat de services pour ${contrat.cabinet}.
+Veuillez trouver ci-joint le contrat de services Médoc - ${contrat.cabinet}.
 
 Informations du contrat :
 - Cabinet : ${contrat.cabinet}
 - Adresse : ${contrat.adresse}, ${contrat.code_postal} ${contrat.ville}
 - Praticiens : ${formatPraticiens(contrat.praticiens)}
-- Montant : ${contrat.prix}€
 
 Merci de nous retourner le contrat signé et tamponné par email.`;
   };

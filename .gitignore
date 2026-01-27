@@ -11,8 +11,50 @@ frontend/build/
 .vscode/
 .vscode/settings.json
 
+# Python environments
+backend/env/
+AUTODOCS-main/env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
 # PDF/contrats générés (potentiellement sensibles)
 backend/services/pdf/uploads/contrats/debug/
+backend/services/pdf/uploads/contrats/*.pdf
+backend/services/pdf/uploads/temp/
 
 # Backend scripts (outils de développement)
 backend/scripts/
+
+# Documentation ancienne (après réorganisation)
+SETUP_PYTHON.md
+README_INTEGRATION.md
+INTEGRATION_README.md
+DEV_GUIDE.md
+BEFORE_AFTER.md
+setup_python.ps1
+setup_python.bat
+
+# Dossier AUTODOCS-main (après réorganisation)
+AUTODOCS-main/
+
+# Fichiers temporaires
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+
+# Fichiers de test temporaires
+backend/services/pdf/uploads/contrats/test_*.pdf
+
+# Fichiers Word/docx temporaires
+~$*.docx
+*.docx~

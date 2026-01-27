@@ -1,6 +1,12 @@
 # Node modules
 node_modules/
 
+# Python environment
+env/
+__pycache__/
+*.pyc
+*.pyo
+
 # PDF générés
 services/
 /services/pdf/uploads/

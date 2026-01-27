@@ -12,13 +12,42 @@ const ContratsList = () => {
   }, []);
 
   const formatPraticiens = (praticiens) => {
-    if (!praticiens || !Array.isArray(praticiens)) return 'Aucun';
+    // Gérer les différents formats possibles
+    if (!praticiens) return 'Aucun';
     
-    return praticiens.map(p => {
+    // Si c'est une string JSON, la parser d'abord
+    let praticiensList = praticiens;
+    if (typeof praticiens === 'string') {
+      try {
+        praticiensList = JSON.parse(praticiens);
+      } catch (e) {
+        // Si c'est une simple string, la retourner
+        return praticiens || 'Aucun';
+      }
+    }
+    
+    // Vérifier que c'est un tableau
+    if (!Array.isArray(praticiensList)) {
+      // Si c'est un objet, convertir ses valeurs en array
+      if (typeof praticiensList === 'object') {
+        praticiensList = Object.values(praticiensList);
+      } else {
+        return 'Aucun';
+      }
+    }
+    
+    // Filtrer les éléments vides
+    if (praticiensList.length === 0) return 'Aucun';
+    
+    // Formater chaque praticien
+    return praticiensList.map(p => {
       if (typeof p === 'object' && p.prenom && p.nom) {
         return `${p.prenom} ${p.nom}`;
+      } else if (typeof p === 'object' && (p.nom || p.prenom)) {
+        // Concaténer nom et prenom s'ils existent
+        return [p.prenom, p.nom].filter(Boolean).join(' ');
       } else if (typeof p === 'string') {
-        return p;
+        return p.trim();
       }
       return '';
     }).filter(Boolean).join(', ') || 'Aucun';

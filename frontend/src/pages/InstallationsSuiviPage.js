@@ -86,6 +86,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const traiterRdvId = urlParams.get("traiter");
+    const newRdv = urlParams.get("new");
 
     if (traiterRdvId && rendezvous.length > 0) {
       const rdv = rendezvous.find((r) => r.id_rdv === parseInt(traiterRdvId, 10));
@@ -94,6 +95,12 @@ const InstallationsSuiviPage = ({ onRetour }) => {
         window.history.replaceState({}, "", "/installations");
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
+    }
+
+    // Support pour ?new=1 afin d'ouvrir le formulaire de création
+    if (newRdv === "1") {
+      setShowForm(true);
+      window.history.replaceState({}, "", "/installations");
     }
   }, [rendezvous]);
 
@@ -373,6 +380,15 @@ const InstallationsSuiviPage = ({ onRetour }) => {
   };
 
   const handleComplete = async (rdv) => {
+    // Pour les types avec checklist (ex: Formation), on force le passage par la modale de traitement
+    // afin de ne pas perdre la checklist et les champs spécifiques avant de marquer comme effectué.
+    const hasChecklist = getChecklistForType(rdv.type_rdv).length > 0;
+    if (hasChecklist) {
+      setTreatmentModalRdv(rdv);
+      showError("Passe par 'Traiter' pour cocher/sauvegarder la checklist avant de marquer comme effectué.");
+      return;
+    }
+
     // Validation praticiens pour les installations
     const typeNeedsPraticiens = ["Installation serveur", "Formation", "Démo"];
 
@@ -1965,7 +1981,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                       
                       showSuccess('Détails de l\'intervention sauvegardés');
                       setTreatmentModalRdv(null);
-                      fetchRendezvous();
+                      fetchRendezvous(true);
                     } catch (error) {
                       console.error('Erreur sauvegarde:', error);
                       showError('Erreur lors de la sauvegarde');
@@ -1993,7 +2009,7 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                       
                       showSuccess('Intervention marquée comme effectuée');
                       setTreatmentModalRdv(null);
-                      fetchRendezvous();
+                      fetchRendezvous(true);
                     } catch (error) {
                       console.error('Erreur:', error);
                       showError('Erreur lors de la sauvegarde');
