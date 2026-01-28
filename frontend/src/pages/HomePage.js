@@ -120,6 +120,26 @@ const HomePage = () => {
     fetchData();
   }, [overdueDays]);
 
+  // Refresh les données quand l'onglet revient au focus
+  useEffect(() => {
+    const handleFocus = () => {
+      const getTodayDate = () => {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      
+      axios.get("http://localhost:4000/api/rendez-vous?includeArchived=true")
+        .then(res => setRendezvous(res.data || []))
+        .catch(() => {});
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
+
   const handleSearch = async (query) => {
     if (query.trim().length < 2) return;
     
