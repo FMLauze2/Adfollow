@@ -61,9 +61,14 @@ const HomePage = () => {
         const todosRes = await axios.get(`http://localhost:4000/api/todos?date=${today}`);
         setTodayTodos(todosRes.data || []);
 
-        // Vérifier si un daily report existe pour aujourd'hui
-        const dailyRes = await axios.get(`http://localhost:4000/api/dailyreports/date/${today}`);
-        setHasDailyReport(dailyRes.data && dailyRes.data.id_report);
+        // Vérifier si un daily report existe pour aujourd'hui (peut ne pas exister)
+        try {
+          const dailyRes = await axios.get(`http://localhost:4000/api/dailyreports/date/${today}`);
+          setHasDailyReport(dailyRes.data && dailyRes.data.id_report);
+        } catch (e) {
+          // Daily report peut ne pas exister, ce n'est pas une erreur
+          setHasDailyReport(false);
+        }
 
         // Inclure tous les RDV (y compris archivés) pour les statistiques
         const rdvRes = await axios.get("http://localhost:4000/api/rendez-vous?includeArchived=true");
@@ -104,6 +109,7 @@ const HomePage = () => {
             const dateB = new Date(b.date_rdv + 'T' + b.heure_rdv);
             return dateA - dateB;
           });
+        
         setUpcomingRdv(upcoming);
       } catch (e) {
         // ignore banner errors
