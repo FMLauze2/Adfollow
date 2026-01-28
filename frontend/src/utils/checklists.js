@@ -15,6 +15,30 @@ export const RDV_CHECKLISTS = {
     { id: 12, label: "Médoc First configuré", required: false, optional: true },
     { id: 13, label: "Interfaçage avec logiciel métier effectué", required: false, optional: true }
   ],
+
+  "Installation complète": [
+    // Installation serveur
+    { id: 1, label: "[INSTALLATION] Regex exécutées", required: true },
+    { id: 2, label: "[INSTALLATION] Port 4900 entrant ouvert", required: true },
+    { id: 3, label: "[INSTALLATION] Utilisateur Medoc créé", required: true },
+    { id: 4, label: "[INSTALLATION] Archive de Médoc décompressée", required: true },
+    { id: 5, label: "[INSTALLATION] Répertoire MEDOC Installations partagé", required: true },
+    { id: 6, label: "[INSTALLATION] Répertoire CRIP Informatique partagé", required: true },
+    { id: 7, label: "[INSTALLATION] API_SV installée", required: true },
+    { id: 8, label: "[INSTALLATION] Structure créée", required: true },
+    { id: 9, label: "[INSTALLATION] Première CPS lue", required: true },
+    { id: 10, label: "[INSTALLATION] HFCS = 1", required: true },
+    { id: 11, label: "[INSTALLATION] BAL Santé créée", required: true },
+    { id: 12, label: "[INSTALLATION] Médoc First configuré", required: false, optional: true },
+    { id: 13, label: "[INSTALLATION] Interfaçage avec logiciel métier effectué", required: false, optional: true },
+    // Formation
+    { id: 14, label: "[FORMATION] Préparer les supports de formation", required: true },
+    { id: 15, label: "[FORMATION] Présenter les fonctionnalités principales", required: true },
+    { id: 16, label: "[FORMATION] Démonstration pratique", required: true },
+    { id: 17, label: "[FORMATION] Exercices pratiques avec l'utilisateur", required: true },
+    { id: 18, label: "[FORMATION] Répondre aux questions", required: true },
+    { id: 19, label: "[FORMATION] Remettre la documentation", required: true }
+  ],
   
   "Installation poste secondaire": [
     { id: 1, label: "Install.exe lancé via le partage", required: true },
