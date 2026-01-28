@@ -10,8 +10,8 @@ function NotificationBell() {
     // Charger les notifications au montage
     fetchNotifications();
 
-    // Polling toutes les 30 secondes
-    const interval = setInterval(fetchNotifications, 30000);
+    // Polling toutes les 15 secondes
+    const interval = setInterval(fetchNotifications, 15000);
 
     return () => clearInterval(interval);
   }, []);
