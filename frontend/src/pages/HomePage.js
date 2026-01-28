@@ -84,14 +84,20 @@ const HomePage = () => {
         const upcoming = (rdvRes.data || [])
           .filter(rdv => {
             if (!rdv.date_rdv || rdv.statut === 'Annulé' || rdv.archive) return false;
-            // Utiliser la date sans parsing pour éviter les problèmes de timezone
+            // Comparer directement les strings de date (YYYY-MM-DD) pour éviter les décalages timezone
             const rdvDateStr = rdv.date_rdv.split('T')[0];
-            const todayDate = new Date(today);
-            const in14Days = new Date(todayDate);
-            in14Days.setDate(in14Days.getDate() + 14);
+            
+            // Calculer la date dans 14 jours comme string (YYYY-MM-DD)
+            const todayObj = new Date();
+            const in14DaysObj = new Date(todayObj);
+            in14DaysObj.setDate(in14DaysObj.getDate() + 14);
+            const year14 = in14DaysObj.getFullYear();
+            const month14 = String(in14DaysObj.getMonth() + 1).padStart(2, '0');
+            const day14 = String(in14DaysObj.getDate()).padStart(2, '0');
+            const in14DaysStr = `${year14}-${month14}-${day14}`;
             
             // Comparer directement les strings de date (YYYY-MM-DD)
-            return rdvDateStr >= today && rdvDateStr <= in14Days.toISOString().split('T')[0];
+            return rdvDateStr >= today && rdvDateStr <= in14DaysStr;
           })
           .sort((a, b) => {
             const dateA = new Date(a.date_rdv + 'T' + a.heure_rdv);
