@@ -7,7 +7,9 @@ function AdminPage() {
   const { user, token, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
+  const [featureFlags, setFeatureFlags] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('users'); // 'users' ou 'features'
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [formData, setFormData] = useState({
@@ -35,10 +37,10 @@ function AdminPage() {
       return;
     }
     fetchUsers();
+    fetchFeatureFlags();
   }, []);
 
   const fetchUsers = async () => {
-    setLoading(true);
     try {
       const response = await axios.get('http://localhost:4000/api/auth/users', {
         headers: { Authorization: `Bearer ${token}` }
@@ -49,6 +51,27 @@ function AdminPage() {
       alert('Erreur lors du chargement des utilisateurs');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFeatureFlags = async () => {
+    try {
+      const response = await axios.get('http://localhost:4000/api/featureflags');
+      setFeatureFlags(response.data || []);
+    } catch (error) {
+      console.error('Erreur chargement feature flags:', error);
+    }
+  };
+
+  const toggleFeatureFlag = async (flagName, currentEnabled) => {
+    try {
+      await axios.put(`http://localhost:4000/api/featureflags/${flagName}`, {
+        enabled: !currentEnabled
+      });
+      fetchFeatureFlags();
+    } catch (error) {
+      console.error('Erreur mise à jour feature flag:', error);
+      alert('Erreur lors de la mise à jour');
     }
   };
 
@@ -202,8 +225,29 @@ function AdminPage() {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
+      <h1 className="text-3xl font-bold text-gray-800 mb-6">⚙️ Administration</h1>
+
+      {/* Onglets */}
+      <div className="flex gap-4 mb-6 border-b border-gray-300">
+        <button
+          onClick={() => setActiveTab('users')}
+          className={`px-4 py-2 font-semibold ${activeTab === 'users' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}`}
+        >
+          👥 Utilisateurs
+        </button>
+        <button
+          onClick={() => setActiveTab('features')}
+          className={`px-4 py-2 font-semibold ${activeTab === 'features' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}`}
+        >
+          ⚙️ Fonctionnalités
+        </button>
+      </div>
+
+      {/* TAB: Utilisateurs */}
+      {activeTab === 'users' && (
+      <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">👥 Gestion des utilisateurs</h1>
+        <h2 className="text-2xl font-bold text-gray-800">Gestion des utilisateurs</h2>
         <button
           onClick={() => setShowForm(!showForm)}
           className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
@@ -490,8 +534,45 @@ function AdminPage() {
           ))}
         </div>
       )}
+      </div>
+      )}
+
+      {/* TAB: Fonctionnalités */}
+      {activeTab === 'features' && (
+      <div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-6">Gestion des fonctionnalités</h2>
+        
+        {featureFlags.length === 0 ? (
+          <p className="text-gray-600">Aucune fonctionnalité configurée</p>
+        ) : (
+          <div className="grid gap-4">
+            {featureFlags.map(flag => (
+              <div key={flag.id} className="bg-white rounded-lg shadow p-6 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">{flag.name}</h3>
+                  {flag.description && (
+                    <p className="text-gray-600 text-sm mt-1">{flag.description}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => toggleFeatureFlag(flag.name, flag.enabled)}
+                  className={`px-4 py-2 rounded font-semibold text-white ${
+                    flag.enabled 
+                      ? 'bg-green-500 hover:bg-green-600' 
+                      : 'bg-red-500 hover:bg-red-600'
+                  }`}
+                >
+                  {flag.enabled ? '✓ Activé' : '✗ Désactivé'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      )}
     </div>
   );
 }
 
 export default AdminPage;
+
