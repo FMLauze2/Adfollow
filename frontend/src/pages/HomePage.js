@@ -84,11 +84,14 @@ const HomePage = () => {
         const upcoming = (rdvRes.data || [])
           .filter(rdv => {
             if (!rdv.date_rdv || rdv.statut === 'Annulé' || rdv.archive) return false;
-            const rdvDate = new Date(rdv.date_rdv.split('T')[0]);
+            // Utiliser la date sans parsing pour éviter les problèmes de timezone
+            const rdvDateStr = rdv.date_rdv.split('T')[0];
             const todayDate = new Date(today);
             const in14Days = new Date(todayDate);
             in14Days.setDate(in14Days.getDate() + 14);
-            return rdvDate >= todayDate && rdvDate <= in14Days;
+            
+            // Comparer directement les strings de date (YYYY-MM-DD)
+            return rdvDateStr >= today && rdvDateStr <= in14Days.toISOString().split('T')[0];
           })
           .sort((a, b) => {
             const dateA = new Date(a.date_rdv + 'T' + a.heure_rdv);
