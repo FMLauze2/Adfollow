@@ -2,19 +2,14 @@ const db = require('./db');
 
 (async () => {
   try {
-    // Afficher la date actuelle du serveur
-    const dateRes = await db.query('SELECT CURRENT_DATE, NOW()::date as date_locale');
-    console.log('Serveur date:', dateRes.rows[0]);
-    
-    // Chercher tous les RDV à partir d'aujourd'hui
+    // Chercher les RDV à facturer ou facturés
     const res = await db.query(`
-      SELECT id_rdv, cabinet, date_rdv, heure_rdv, statut, archive
-      FROM rendez_vous 
-      WHERE DATE(date_rdv AT TIME ZONE 'Europe/Paris') >= CURRENT_DATE
-      ORDER BY date_rdv DESC
-      LIMIT 20
+      SELECT id_rdv, cabinet, statut FROM rendez_vous 
+      WHERE statut IN ('Effectué', 'Facturé') 
+      ORDER BY id_rdv DESC 
+      LIMIT 10
     `);
-    console.log('\nRDV à partir d\'aujourd\'hui:');
+    console.log('RDV à facturer ou facturés:');
     console.log(JSON.stringify(res.rows, null, 2));
   } catch (error) {
     console.error('Erreur:', error);

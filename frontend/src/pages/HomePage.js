@@ -71,7 +71,9 @@ const HomePage = () => {
         }
 
         // Inclure tous les RDV (y compris archivés) pour les statistiques
-        const rdvRes = await axios.get("http://localhost:4000/api/rendez-vous?includeArchived=true");
+        const rdvRes = await axios.get("http://localhost:4000/api/rendez-vous?includeArchived=true", {
+          headers: { 'Cache-Control': 'no-cache' }
+        });
         setRendezvous(rdvRes.data || []);
         
         const todayRdv = (rdvRes.data || []).filter(rdv => {
@@ -299,19 +301,35 @@ const HomePage = () => {
 
         {/* Bannière RDV à facturer */}
         {!loading && rendezvous.filter(r => r.statut === 'Effectué' && !r.archive).length > 0 && (
-          <div className="rounded border border-purple-300 bg-purple-50 text-left p-4 flex items-center justify-between">
-            <div>
-              <p className="text-purple-800 font-semibold">
-                💰 {rendezvous.filter(r => r.statut === 'Effectué' && !r.archive).length} rendez-vous à facturer
-              </p>
-              <p className="text-purple-700 text-sm">Des RDV effectués sont en attente de facturation.</p>
+          <div className="rounded border border-purple-300 bg-purple-50 text-left p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-purple-800 font-semibold">
+                  💰 {rendezvous.filter(r => r.statut === 'Effectué' && !r.archive).length} rendez-vous à facturer
+                </p>
+                <p className="text-purple-700 text-sm">Des RDV effectués sont en attente de facturation.</p>
+              </div>
+              <a
+                href="/installations"
+                className="ml-4 inline-block bg-purple-500 hover:bg-purple-600 text-white font-medium py-2 px-4 rounded"
+              >
+                Voir les RDV
+              </a>
             </div>
-            <a
-              href="/installations"
-              className="ml-4 inline-block bg-purple-500 hover:bg-purple-600 text-white font-medium py-2 px-4 rounded"
-            >
-              Voir les RDV
-            </a>
+            {/* Liste des structures à facturer */}
+            <div className="mt-3 pt-3 border-t border-purple-200">
+              <p className="text-purple-700 text-sm font-medium mb-2">Structures concernées:</p>
+              <div className="flex flex-wrap gap-2">
+                {rendezvous
+                  .filter(r => r.statut === 'Effectué' && !r.archive)
+                  .map(r => (
+                    <span key={r.id_rdv} className="bg-purple-200 text-purple-900 text-xs px-2 py-1 rounded">
+                      {r.cabinet}
+                    </span>
+                  ))
+                }
+              </div>
+            </div>
           </div>
         )}
       </div>
