@@ -4,6 +4,7 @@ import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 // Import de la navbar et des pages
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { FeatureFlagProvider } from "./contexts/FeatureFlagContext";
 import { useTheme } from "./contexts/ThemeContext";
 import Navbar from "./components/Navbar";
 import ToastContainer from "./components/ToastContainer";
@@ -18,8 +19,10 @@ import MesStatsPage from "./pages/MesStatsPage";
 import PraticiensPage from "./pages/PraticiensPage";
 import KnowledgeBasePage from "./pages/KnowledgeBasePage";
 import AdminPage from "./pages/AdminPage";
-import DailyReportsPage from "./pages/DailyReportsPage";
 import notificationManager from "./services/NotificationManager";
+
+// Import de la page de backup non utilisée
+// import InstallationsPage_backup from "./pages/InstallationsPage_backup";
 
 // Composant pour protéger les routes
 function ProtectedRoute({ children }) {
@@ -81,6 +84,7 @@ function AppContent() {
     };
   }, [isAuthenticated]);
 
+  const { flags } = require("./contexts/FeatureFlagContext").useFeatureFlags();
   return (
     <>
       <ToastContainer />
@@ -96,8 +100,10 @@ function AppContent() {
           <Route path="/mes-stats" element={<ProtectedRoute><MesStatsPage /></ProtectedRoute>} />
           <Route path="/installations" element={<ProtectedRoute><InstallationsSuiviPage /></ProtectedRoute>} />
           <Route path="/praticiens" element={<ProtectedRoute><PraticiensPage /></ProtectedRoute>} />
-          <Route path="/knowledge" element={<ProtectedRoute><KnowledgeBasePage /></ProtectedRoute>} />
-          <Route path="/dailyreports" element={<ProtectedRoute><DailyReportsPage /></ProtectedRoute>} />
+          {flags?.knowledge_base !== false && (
+            <Route path="/knowledge" element={<ProtectedRoute><KnowledgeBasePage /></ProtectedRoute>} />
+          )}
+          {/* Ajoute ici d'autres routes conditionnelles si besoin */}
           <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
         </Routes>
       </div>
@@ -110,7 +116,9 @@ function App() {
   return (    
     <Router>
       <AuthProvider>
-        <AppContent />
+        <FeatureFlagProvider>
+          <AppContent />
+        </FeatureFlagProvider>
       </AuthProvider>
     </Router>   
   );

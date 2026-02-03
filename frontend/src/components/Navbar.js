@@ -2,6 +2,8 @@ import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTheme } from "../contexts/ThemeContext";
 import { useAuth } from "../contexts/AuthContext";
+
+import { useFeatureFlags } from "../contexts/FeatureFlagContext";
 import NotificationBell from "./NotificationBell";
 
 const Navbar = () => {
@@ -14,6 +16,8 @@ const Navbar = () => {
     navigate('/login');
   };
 
+  const { flags } = useFeatureFlags();
+
   return (
     <nav style={styles.nav}>
       <h2 style={styles.logo}>
@@ -25,24 +29,24 @@ const Navbar = () => {
         <Link style={styles.link} to="/installations">Rendez-vous</Link>
         <Link style={styles.link} to="/calendrier">Calendrier</Link>
         <Link style={styles.link} to="/contrats">Contrats</Link>
-        <Link style={styles.link} to="/dailyreports">📊 Daily Reports</Link>
-        <Link style={styles.link} to="/knowledge">📚 Base de connaissances</Link>
-        
+        {flags?.daily_reports !== false && (
+          <Link style={styles.link} to="/dailyreports">📊 Daily Reports</Link>
+        )}
+        {flags?.knowledge_base !== false && (
+          <Link style={styles.link} to="/knowledge">📚 Base de connaissances</Link>
+        )}
         {/* Admin link (visible uniquement pour les admins) */}
         {user && user.role === 'admin' && (
           <Link style={styles.link} to="/admin">⚙️ Administration</Link>
         )}
-        
         {/* Notifications */}
         <NotificationBell />
-
         {/* Info utilisateur */}
         {user && (
           <span style={{ ...styles.link, cursor: 'default', opacity: 0.8 }}>
             👤 {user.prenom || user.username}
           </span>
         )}
-
         {/* Bouton Déconnexion */}
         <button
           onClick={handleLogout}

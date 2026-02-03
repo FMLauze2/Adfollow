@@ -16,6 +16,22 @@ function NotificationBell() {
     return () => clearInterval(interval);
   }, []);
 
+
+  // Utiliser localStorage pour mémoriser les notifications fermées
+  const getClosedNotifIds = () => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem('closedNotifIds') || '[]'));
+    } catch {
+      return new Set();
+    }
+  };
+
+  const addClosedNotifId = (id) => {
+    const ids = getClosedNotifIds();
+    ids.add(id);
+    localStorage.setItem('closedNotifIds', JSON.stringify(Array.from(ids)));
+  };
+
   const fetchNotifications = async () => {
     try {
       const response = await axios.get('http://localhost:4000/api/notifications/unread');
@@ -23,9 +39,13 @@ function NotificationBell() {
       setNotifications(notifs);
       setUnreadCount(notifs.length);
 
-      // Afficher une notification browser si nouvelle notification
+      // Afficher une notification browser si nouvelle notification non fermée
       if (notifs.length > unreadCount && unreadCount >= 0) {
-        showBrowserNotification(notifs[0]);
+        const closedIds = getClosedNotifIds();
+        const firstNew = notifs.find(n => !closedIds.has(n.id_notification));
+        if (firstNew) {
+          showBrowserNotification(firstNew);
+        }
       }
     } catch (error) {
       console.error('Erreur chargement notifications:', error);
@@ -34,6 +54,10 @@ function NotificationBell() {
 
   const showBrowserNotification = (notification) => {
     if (!notification) return;
+
+    // Ne pas réafficher si déjà fermée
+    const closedIds = getClosedNotifIds();
+    if (closedIds.has(notification.id_notification)) return;
 
     // Demander la permission si pas encore accordée
     if (Notification.permission === 'default') {
@@ -54,13 +78,17 @@ function NotificationBell() {
       playNotificationSound();
 
       // Fermer après 10 secondes
-      setTimeout(() => notif.close(), 10000);
+      setTimeout(() => {
+        notif.close();
+        addClosedNotifId(notification.id_notification);
+      }, 10000);
 
       // Clic sur la notification
       notif.onclick = () => {
         window.focus();
         markAsRead(notification.id_notification);
         notif.close();
+        addClosedNotifId(notification.id_notification);
       };
     }
   };
