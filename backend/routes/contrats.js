@@ -21,7 +21,13 @@ const parsePraticiens = (contrat) => {
 // GET all contrats
 router.get('/', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM contrats ORDER BY id_contrat');
+    const result = await pool.query(`
+      SELECT id_contrat, cabinet, adresse, code_postal, ville, praticiens, prix, email,
+             TO_CHAR(date_envoi, 'YYYY-MM-DD') as date_envoi, 
+             TO_CHAR(date_reception, 'YYYY-MM-DD') as date_reception, 
+             TO_CHAR(date_creation, 'YYYY-MM-DD') as date_creation
+      FROM contrats ORDER BY id_contrat
+    `);
     
     // Ajouter le statut calculé à chaque contrat + parser les praticiens
     const contratsAvecStatut = result.rows.map(contrat => {
@@ -45,7 +51,13 @@ router.get('/', async (req, res) => {
   router.get('/:id', async (req, res) => {
     try {
       const { id } = req.params;
-      const result = await pool.query('SELECT * FROM contrats WHERE id_contrat = $1', [id]);
+      const result = await pool.query(`
+        SELECT id_contrat, cabinet, adresse, code_postal, ville, praticiens, prix, email,
+               TO_CHAR(date_envoi, 'YYYY-MM-DD') as date_envoi, 
+               TO_CHAR(date_reception, 'YYYY-MM-DD') as date_reception, 
+               TO_CHAR(date_creation, 'YYYY-MM-DD') as date_creation
+        FROM contrats WHERE id_contrat = $1
+      `, [id]);
       
       if (result.rows.length > 0) {
         const contrat = result.rows[0];
@@ -69,7 +81,21 @@ router.get('/', async (req, res) => {
     // POST create new contrat
   router.post('/', async (req, res) => {
     try {
-      let { cabinet, adresse, code_postal, ville, praticiens, prix, email, date_envoi, date_reception } = req.body;
+      let { cabinet, adresse, code_postal, ville, praticiens, prix, email, date_envoi, date_reception, date_creation } = req.body;
+
+      // Convertir les chaînes vides en null pour les dates
+      date_envoi = date_envoi && date_envoi.trim() !== '' ? date_envoi : null;
+      date_reception = date_reception && date_reception.trim() !== '' ? date_reception : null;
+      date_creation = date_creation && date_creation.trim() !== '' ? date_creation : null;
+
+      console.log('===== CRÉATION CONTRAT =====');
+      console.log('cabinet:', cabinet);
+      console.log('adresse:', adresse);
+      console.log('code_postal:', code_postal);
+      console.log('ville:', ville);
+      console.log('Date création reçue:', date_creation);
+      console.log('Date envoi:', date_envoi);
+      console.log('Date réception:', date_reception);
 
       // Convertir praticiens en JSON si ce n'est pas déjà
       if (!Array.isArray(praticiens)) {
@@ -81,13 +107,37 @@ router.get('/', async (req, res) => {
       }
 
       // Insertion du contrat
-      const result = await pool.query(
-        `INSERT INTO contrats (cabinet, adresse, code_postal, ville, praticiens, prix, email, date_envoi, date_reception, date_creation)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW()) RETURNING *`,
-        [cabinet, adresse, code_postal, ville, JSON.stringify(praticiens), prix, email || null, date_envoi || null, date_reception || null]
-      );
+      let query, params;
+      
+      if (date_creation) {
+        // Si date_creation fournie, l'utiliser
+        query = `INSERT INTO contrats (cabinet, adresse, code_postal, ville, praticiens, prix, email, date_envoi, date_reception, date_creation)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) 
+                 RETURNING id_contrat, cabinet, adresse, code_postal, ville, praticiens, prix, email,
+                           TO_CHAR(date_envoi, 'YYYY-MM-DD') as date_envoi,
+                           TO_CHAR(date_reception, 'YYYY-MM-DD') as date_reception,
+                           TO_CHAR(date_creation, 'YYYY-MM-DD') as date_creation`;
+        params = [cabinet, adresse, code_postal, ville, JSON.stringify(praticiens), prix, email || null, date_envoi || null, date_reception || null, date_creation];
+        console.log('Utilisation de date_creation fournie:', date_creation);
+      } else {
+        // Sinon utiliser CURRENT_DATE
+        query = `INSERT INTO contrats (cabinet, adresse, code_postal, ville, praticiens, prix, email, date_envoi, date_reception, date_creation)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,CURRENT_DATE) 
+                 RETURNING id_contrat, cabinet, adresse, code_postal, ville, praticiens, prix, email,
+                           TO_CHAR(date_envoi, 'YYYY-MM-DD') as date_envoi,
+                           TO_CHAR(date_reception, 'YYYY-MM-DD') as date_reception,
+                           TO_CHAR(date_creation, 'YYYY-MM-DD') as date_creation`;
+        params = [cabinet, adresse, code_postal, ville, JSON.stringify(praticiens), prix, email || null, date_envoi || null, date_reception || null];
+        console.log('Utilisation de CURRENT_DATE pour date_creation');
+      }
+      
+      console.log('Params envoyés à PostgreSQL:', params);
+      console.log('Query SQL:', query);
+      
+      const result = await pool.query(query, params);
 
       const contratCree = result.rows[0];
+      console.log('Contrat créé en base:', contratCree);
 
       // Génération du PDF
       try {

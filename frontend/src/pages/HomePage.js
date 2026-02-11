@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useFeatureFlags } from "../contexts/FeatureFlagContext";
 import axios from "axios";
 
 const HomePage = () => {
@@ -241,12 +242,13 @@ const HomePage = () => {
     }
   };
 
+  const { flags } = useFeatureFlags();
   return (
     <div className="text-center py-12">
       {/* Bannières Notifications */}
       <div className="max-w-6xl mx-auto mb-6 space-y-4">
         {/* Bannière Daily Report manquant */}
-        {!loading && !hasDailyReport && (
+        {flags?.daily_reports !== false && !loading && !hasDailyReport && (
           <div className="rounded border border-orange-300 bg-orange-50 text-left p-4 flex items-center justify-between">
             <div>
               <p className="text-orange-800 font-semibold">

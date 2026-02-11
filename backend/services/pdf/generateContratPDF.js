@@ -7,7 +7,7 @@ const { generateContratPDFPython, checkPythonEnvironment } = require('./generate
 let pythonAvailable = null;
 
 /**
- * Génère un PDF de contrat - utilise Python en priorité, fallback vers Puppeteer
+ * Génère un PDF de contrat - utilise UNIQUEMENT Python
  */
 async function generateContratPDF(contrat) {
   // Vérifier si Python est disponible (cache le résultat)
@@ -16,22 +16,14 @@ async function generateContratPDF(contrat) {
     console.log(`Python environment disponible: ${pythonAvailable}`);
   }
   
-  // Essayer d'utiliser Python si disponible
-  if (pythonAvailable) {
-    try {
-      console.log('Génération PDF avec Python (meilleur rendu)...');
-      const pdfPath = await generateContratPDFPython(contrat);
-      console.log(`✓ PDF généré avec succès via Python: ${pdfPath}`);
-      return pdfPath;
-    } catch (pythonError) {
-      console.warn('⚠ Erreur génération PDF Python, fallback vers Puppeteer:', pythonError.message);
-      // Continuer avec Puppeteer
-    }
+  if (!pythonAvailable) {
+    throw new Error('Python n\'est pas disponible. Impossible de générer le PDF.');
   }
   
-  // Fallback: utiliser Puppeteer (ancienne méthode)
-  console.log('Génération PDF avec Puppeteer (fallback)...');
-  return generateContratPDFPuppeteer(contrat);
+  console.log('Génération PDF avec Python...');
+  const pdfPath = await generateContratPDFPython(contrat);
+  console.log(`✓ PDF généré avec succès via Python: ${pdfPath}`);
+  return pdfPath;
 }
 
 /**

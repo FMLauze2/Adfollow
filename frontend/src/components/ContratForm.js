@@ -12,6 +12,7 @@ const ContratsForm = () => {
   const [email, setEmail] = useState('');
   const [dateEnvoi, setDateEnvoi] = useState('');
   const [dateReception, setDateReception] = useState('');
+  const [dateCreation, setDateCreation] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -32,8 +33,15 @@ const ContratsForm = () => {
       prix: parseFloat(prix),
       email: email || null,
       date_envoi: dateEnvoi || null,
-      date_reception: dateReception || null
+      date_reception: dateReception || null,
+      date_creation: dateCreation || null
     };
+
+    console.log('===== FRONTEND =====');
+    console.log('dateCreation (state):', dateCreation);
+    console.log('dateCreation (typeof):', typeof dateCreation);
+    console.log('newContrat.date_creation:', newContrat.date_creation);
+    console.log('Données complètes envoyées:', JSON.stringify(newContrat, null, 2));
 
     try {
       await axios.post('http://localhost:4000/api/contrats', newContrat);
@@ -48,6 +56,7 @@ const ContratsForm = () => {
       setEmail('');
       setDateEnvoi('');
       setDateReception('');
+      setDateCreation('');
 
     } catch (err) {
       console.error(err);
@@ -59,8 +68,13 @@ const ContratsForm = () => {
 
   const handleFillTestData = (e) => {
     e.preventDefault();
-    const today = new Date().toISOString().split('T')[0];
-    const tomorrow = new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    // Créer les dates au format YYYY-MM-DD sans conversion timezone
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    
+    const tomorrowDate = new Date(now);
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const tomorrow = `${tomorrowDate.getFullYear()}-${String(tomorrowDate.getMonth() + 1).padStart(2, '0')}-${String(tomorrowDate.getDate()).padStart(2, '0')}`;
     
     setCabinet('Cabinet Test');
     setAdresse('123 Rue de Test');
@@ -71,6 +85,7 @@ const ContratsForm = () => {
     setEmail('contact@cabinettest.fr');
     setDateEnvoi(today);
     setDateReception(tomorrow);
+    setDateCreation(today);
   };
 
   return (
@@ -217,6 +232,18 @@ const ContratsForm = () => {
             disabled={loading}
             className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-100"
           />
+        </div>
+
+        <div className="flex flex-col">
+          <label className="mb-1 font-medium text-gray-700">Date de création/début du contrat</label>
+          <input
+            type="date"
+            value={dateCreation}
+            onChange={e => setDateCreation(e.target.value)}
+            disabled={loading}
+            className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-100"
+          />
+          <p className="text-xs text-gray-500 mt-1">Permet d'antidater un contrat. Si vide, la date actuelle sera utilisée.</p>
         </div>
 
         <div className="flex gap-2">
