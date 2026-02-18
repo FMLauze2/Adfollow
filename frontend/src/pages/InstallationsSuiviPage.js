@@ -1859,9 +1859,30 @@ const InstallationsSuiviPage = ({ onRetour }) => {
               {/* Checklist */}
               {treatmentForm.checklist && treatmentForm.checklist.length > 0 && (
                 <div className="border rounded-lg p-4" style={{ backgroundColor: '#D1FAE5', borderColor: '#10B981' }}>
-                  <h3 className="font-bold mb-3" style={{ color: '#065F46', fontSize: '18px' }}>
-                    ✅ Checklist - {treatmentModalRdv.type_rdv}
-                  </h3>
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-bold" style={{ color: '#065F46', fontSize: '18px' }}>
+                      ✅ Checklist - {treatmentModalRdv.type_rdv}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allChecked = treatmentForm.checklist.every(item => item.checked);
+                        const updatedChecklist = treatmentForm.checklist.map(item => ({
+                          ...item,
+                          checked: !allChecked
+                        }));
+                        setTreatmentForm({ ...treatmentForm, checklist: updatedChecklist });
+                      }}
+                      className="px-3 py-1 rounded text-sm font-medium transition"
+                      style={{
+                        backgroundColor: treatmentForm.checklist.every(item => item.checked) ? '#EF4444' : '#10B981',
+                        color: '#FFFFFF'
+                      }}
+                      title={treatmentForm.checklist.every(item => item.checked) ? 'Tout décocher' : 'Tout cocher'}
+                    >
+                      {treatmentForm.checklist.every(item => item.checked) ? '☐ Tout décocher' : '✓ Tout cocher'}
+                    </button>
+                  </div>
                   <div className="space-y-2">
                     {treatmentForm.checklist.map((item, index) => (
                       <label 
