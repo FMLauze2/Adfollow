@@ -8,8 +8,13 @@ function AdminPage() {
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [featureFlags, setFeatureFlags] = useState([]);
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [logsTotal, setLogsTotal] = useState(0);
+  const [logsPage, setLogsPage] = useState(0);
+  const [logsLimit] = useState(50);
+  const [logsFilter, setLogsFilter] = useState({ user: '', entity_type: '', action: '' });
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('users'); // 'users' ou 'features'
+  const [activeTab, setActiveTab] = useState('users'); // 'users', 'features', ou 'logs'
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [formData, setFormData] = useState({
@@ -38,6 +43,7 @@ function AdminPage() {
     }
     fetchUsers();
     fetchFeatureFlags();
+    fetchActivityLogs();
   }, []);
 
   const fetchUsers = async () => {
@@ -60,6 +66,25 @@ function AdminPage() {
       setFeatureFlags(response.data || []);
     } catch (error) {
       console.error('Erreur chargement feature flags:', error);
+    }
+  };
+
+  const fetchActivityLogs = async (page = 0) => {
+    try {
+      const params = new URLSearchParams({
+        limit: logsLimit,
+        offset: page * logsLimit,
+        ...(logsFilter.user && { user: logsFilter.user }),
+        ...(logsFilter.entity_type && { entity_type: logsFilter.entity_type }),
+        ...(logsFilter.action && { action: logsFilter.action })
+      });
+
+      const response = await axios.get(`http://localhost:4000/api/activity-logs?${params}`);
+      setActivityLogs(response.data.logs || []);
+      setLogsTotal(response.data.total || 0);
+      setLogsPage(page);
+    } catch (error) {
+      console.error('Erreur chargement logs:', error);
     }
   };
 
@@ -240,6 +265,12 @@ function AdminPage() {
           className={`px-4 py-2 font-semibold ${activeTab === 'features' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}`}
         >
           ⚙️ Fonctionnalités
+        </button>
+        <button
+          onClick={() => { setActiveTab('logs'); fetchActivityLogs(0); }}
+          className={`px-4 py-2 font-semibold ${activeTab === 'logs' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}`}
+        >
+          📋 Logs d'activité
         </button>
       </div>
 
@@ -568,6 +599,165 @@ function AdminPage() {
             ))}
           </div>
         )}
+      </div>
+      )}
+
+      {/* TAB: Logs d'activité */}
+      {activeTab === 'logs' && (
+      <div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-6">Logs d'activité</h2>
+        
+        {/* Filtres */}
+        <div className="bg-white rounded-lg shadow p-4 mb-6">
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Utilisateur</label>
+              <input
+                type="text"
+                value={logsFilter.user}
+                onChange={(e) => setLogsFilter({ ...logsFilter, user: e.target.value })}
+                placeholder="Filtrer par utilisateur"
+                className="w-full border px-3 py-2 rounded"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Type d'entité</label>
+              <select
+                value={logsFilter.entity_type}
+                onChange={(e) => setLogsFilter({ ...logsFilter, entity_type: e.target.value })}
+                className="w-full border px-3 py-2 rounded"
+              >
+                <option value="">Tous</option>
+                <option value="rdv">RDV</option>
+                <option value="contrat">Contrat</option>
+                <option value="knowledge">Base de connaissances</option>
+                <option value="auth">Authentification</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Action</label>
+              <select
+                value={logsFilter.action}
+                onChange={(e) => setLogsFilter({ ...logsFilter, action: e.target.value })}
+                className="w-full border px-3 py-2 rounded"
+              >
+                <option value="">Toutes</option>
+                <option value="create">Création</option>
+                <option value="update">Modification</option>
+                <option value="delete">Suppression</option>
+                <option value="login">Connexion</option>
+              </select>
+            </div>
+          </div>
+          <div className="mt-4 flex gap-2">
+            <button
+              onClick={() => fetchActivityLogs(0)}
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+            >
+              🔍 Filtrer
+            </button>
+            <button
+              onClick={() => {
+                setLogsFilter({ user: '', entity_type: '', action: '' });
+                fetchActivityLogs(0);
+              }}
+              className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
+            >
+              ✕ Réinitialiser
+            </button>
+          </div>
+        </div>
+
+        {/* Tableau des logs */}
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-100 border-b">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Date/Heure</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Utilisateur</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Action</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Entité</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Détails</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {activityLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="px-4 py-8 text-center text-gray-500">
+                      Aucun log trouvé
+                    </td>
+                  </tr>
+                ) : (
+                  activityLogs.map((log) => (
+                    <tr key={log.id_log} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm">
+                        {new Date(log.created_at).toLocaleString('fr-FR')}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium">{log.user_name}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                          log.action === 'create' ? 'bg-green-100 text-green-800' :
+                          log.action === 'update' ? 'bg-blue-100 text-blue-800' :
+                          log.action === 'delete' ? 'bg-red-100 text-red-800' :
+                          log.action === 'login' ? 'bg-purple-100 text-purple-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {log.action === 'create' ? '➕ Création' :
+                           log.action === 'update' ? '✏️ Modification' :
+                           log.action === 'delete' ? '🗑️ Suppression' :
+                           log.action === 'login' ? '🔐 Connexion' :
+                           log.action}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <div className="font-medium">{log.entity_type}</div>
+                        {log.entity_name && (
+                          <div className="text-xs text-gray-500">{log.entity_name}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {log.details && (
+                          <details className="cursor-pointer">
+                            <summary className="text-blue-600 hover:text-blue-800">Voir détails</summary>
+                            <pre className="mt-2 text-xs bg-gray-100 p-2 rounded overflow-x-auto">
+                              {JSON.stringify(typeof log.details === 'string' ? JSON.parse(log.details) : log.details, null, 2)}
+                            </pre>
+                          </details>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {logsTotal > logsLimit && (
+            <div className="border-t bg-gray-50 px-4 py-3 flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                Affichage de {logsPage * logsLimit + 1} à {Math.min((logsPage + 1) * logsLimit, logsTotal)} sur {logsTotal} logs
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => fetchActivityLogs(logsPage - 1)}
+                  disabled={logsPage === 0}
+                  className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                >
+                  ← Précédent
+                </button>
+                <button
+                  onClick={() => fetchActivityLogs(logsPage + 1)}
+                  disabled={(logsPage + 1) * logsLimit >= logsTotal}
+                  className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                >
+                  Suivant →
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
       )}
     </div>

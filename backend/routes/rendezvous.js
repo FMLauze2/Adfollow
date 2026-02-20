@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const generateICS = require('../services/ics/generateICS');
+const ActivityLogger = require('../services/ActivityLogger');
 
 // GET tous les RDV
 router.get('/', async (req, res) => {
@@ -69,6 +70,9 @@ router.post('/', async (req, res) => {
        RETURNING *`,
       [cabinet, correctedDate, heure_rdv, type_rdv, adresse || null, code_postal || null, ville || null, JSON.stringify(praticiens || []), notes || null, telephone || null, email || null]
     );
+
+    // Logger l'action
+    await ActivityLogger.logCreate('user', 'rdv', result.rows[0].id_rdv, cabinet, { type_rdv, date_rdv: correctedDate });
 
     res.status(201).json(result.rows[0]);
   } catch (err) {

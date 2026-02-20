@@ -28,6 +28,8 @@ const sprintsRoutes = require('./routes/sprints');
 const equipeRoutes = require('./routes/equipe');
 const importIcsRoutes = require('./routes/importics');
 const featureflagsRoutes = require('./routes/featureflags');
+const activitylogsRoutes = require('./routes/activitylogs');
+const searchRoutes = require('./routes/search');
 const { router: authRoutes } = require('./routes/auth');
 
 // Import services
@@ -47,6 +49,8 @@ app.use('/api/sprints', sprintsRoutes);
 app.use('/api/equipe', equipeRoutes);
 app.use('/api/import-ics', importIcsRoutes);
 app.use('/api/featureflags', featureflagsRoutes);
+app.use('/api/activity-logs', activitylogsRoutes);
+app.use('/api/search', searchRoutes);
 app.use('/api/auth', authRoutes);
 
 app.listen(4000, () => {

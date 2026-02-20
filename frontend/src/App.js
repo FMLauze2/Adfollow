@@ -1,7 +1,7 @@
 import logo from './logo.svg';
 import './App.css';
-import React, { useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 // Import de la navbar et des pages
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { FeatureFlagProvider } from "./contexts/FeatureFlagContext";
@@ -71,6 +71,8 @@ function Footer() {
 
 function AppContent() {
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // Démarrer le gestionnaire de notifications au montage
   useEffect(() => {
@@ -84,11 +86,46 @@ function AppContent() {
     };
   }, [isAuthenticated]);
 
+  // Raccourcis clavier globaux
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ctrl+K ou Cmd+K : Ouvrir la recherche
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+      
+      // Ctrl+N : Nouveau RDV
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault();
+        navigate('/installations');
+      }
+
+      // Ctrl+Shift+C : Nouveau contrat
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'C') {
+        e.preventDefault();
+        navigate('/contrats/nouveau');
+      }
+
+      // Ctrl+H : Accueil
+      if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+        e.preventDefault();
+        navigate('/');
+      }
+    };
+
+    if (isAuthenticated()) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isAuthenticated, navigate]);
+
   const { flags } = require("./contexts/FeatureFlagContext").useFeatureFlags();
+  
   return (
     <>
       <ToastContainer />
-      {isAuthenticated() && <Navbar />}
+      {isAuthenticated() && <Navbar searchOpen={searchOpen} setSearchOpen={setSearchOpen} />}
       <div style={{ padding: isAuthenticated() ? "20px" : "0", minHeight: "calc(100vh - 140px)" }}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />

@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { generateContratPDF } = require('../services/pdf/generateContratPDF');
+const ActivityLogger = require('../services/ActivityLogger');
 
 // Fonction utilitaire pour parser les praticiens (JSONB -> array)
 const parsePraticiens = (contrat) => {
@@ -138,6 +139,9 @@ router.get('/', async (req, res) => {
 
       const contratCree = result.rows[0];
       console.log('Contrat créé en base:', contratCree);
+
+      // Logger l'action
+      await ActivityLogger.logCreate('user', 'contrat', contratCree.id_contrat, cabinet, { prix, date_creation: contratCree.date_creation });
 
       // Génération du PDF
       try {
