@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import ImportICS from "../components/ImportICS";
+import VilleCodePostalInput from "../components/VilleCodePostalInput";
 import api from "../api/Api";
 import { showError, showSuccess } from "../utils/toast";
 import { getChecklistForType } from "../utils/checklists";
@@ -1170,42 +1171,17 @@ const InstallationsSuiviPage = ({ onRetour }) => {
                     placeholder="12 rue de la Santé"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Code Postal <span className="text-red-500 font-normal">*</span></label>
-                  <input
-                    type="text"
+                
+                <div className="col-span-2">
+                  <VilleCodePostalInput
+                    codePostal={form.code_postal}
+                    ville={form.ville}
+                    onCodePostalChange={(value) => setForm({ ...form, code_postal: value })}
+                    onVilleChange={(value) => setForm({ ...form, ville: value })}
                     required
-                    value={form.code_postal}
-                    onChange={async (e) => {
-                      const cp = e.target.value;
-                      setForm({ ...form, code_postal: cp });
-                      if (cp.length === 5 && /^\d{5}$/.test(cp)) {
-                        try {
-                          const response = await fetch(`https://geo.api.gouv.fr/communes?codePostal=${cp}&fields=nom&format=json`);
-                          const data = await response.json();
-                          if (data && data.length > 0) {
-                            setForm(prev => ({ ...prev, ville: data[0].nom }));
-                          }
-                        } catch (error) {
-                          console.error("Erreur API Geo:", error);
-                        }
-                      }
-                    }}
-                    className={`w-full border px-3 py-2 rounded ${form.code_postal === '' ? 'border-red-500' : ''}`}
-                    placeholder="75001"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Ville <span className="text-red-500 font-normal">*</span></label>
-                  <input
-                    type="text"
-                    required
-                    value={form.ville}
-                    onChange={(e) => setForm({ ...form, ville: e.target.value })}
-                    className={`w-full border px-3 py-2 rounded ${form.ville === '' ? 'border-red-500' : ''}`}
-                    placeholder="Paris"
-                  />
-                </div>
+
                 <div className="col-span-2">
                   <label className="block text-sm font-medium mb-1">Praticiens <span className="text-red-500 font-normal">*</span></label>
                   <input
@@ -2067,14 +2043,15 @@ const InstallationsSuiviPage = ({ onRetour }) => {
               Adresse :
               <input name="adresse" value={form.adresse} onChange={e => setForm({ ...form, adresse: e.target.value })} required className="border px-2 py-1 rounded w-full" />
             </label>
-            <label className="block">
-              Code postal :
-              <input name="code_postal" value={form.code_postal} onChange={e => setForm({ ...form, code_postal: e.target.value })} required className="border px-2 py-1 rounded w-full" />
-            </label>
-            <label className="block">
-              Ville :
-              <input name="ville" value={form.ville} onChange={e => setForm({ ...form, ville: e.target.value })} required className="border px-2 py-1 rounded w-full" />
-            </label>
+            
+            <VilleCodePostalInput
+              codePostal={form.code_postal}
+              ville={form.ville}
+              onCodePostalChange={(value) => setForm({ ...form, code_postal: value })}
+              onVilleChange={(value) => setForm({ ...form, ville: value })}
+              required
+            />
+
             <div className="flex gap-2 mt-4">
               <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded">Valider</button>
               <button type="button" onClick={() => setShowContratForm(false)} className="bg-gray-300 px-4 py-2 rounded">Annuler</button>

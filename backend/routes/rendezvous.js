@@ -213,6 +213,19 @@ router.put('/:id', async (req, res) => {
 
     const updatedRdv = result.rows[0];
 
+    // Si un contrat a été lié au RDV, supprimer la notification de contrat manquant
+    if (id_contrat !== undefined && id_contrat !== null) {
+      try {
+        await pool.query(
+          'DELETE FROM notifications WHERE type_notification = $1 AND id_rdv = $2',
+          ['contrat_manquant', id]
+        );
+        console.log(`Notification de contrat manquant supprimée pour RDV #${id}`);
+      } catch (notifErr) {
+        console.error('Erreur suppression notification:', notifErr);
+      }
+    }
+
     // Si le RDV a un contrat associé et que l'email a été modifié, synchroniser avec le contrat
     if (updatedRdv.id_contrat && email !== undefined) {
       try {
@@ -467,6 +480,12 @@ router.post('/:id/create-contrat', async (req, res) => {
     await pool.query(
       'UPDATE rendez_vous SET id_contrat = $1 WHERE id_rdv = $2',
       [nouveauContrat.id_contrat, id]
+    );
+    
+    // Supprimer la notification de contrat manquant pour ce RDV
+    await pool.query(
+      'DELETE FROM notifications WHERE type_notification = $1 AND id_rdv = $2',
+      ['contrat_manquant', id]
     );
     
     res.status(201).json({ 

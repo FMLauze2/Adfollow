@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import VilleCodePostalInput from "../components/VilleCodePostalInput";
 
 function CalendrierPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -723,28 +724,15 @@ function CalendrierPage() {
                     className="w-full border border-gray-300 rounded px-3 py-2"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Code postal</label>
-                    <input
-                      type="text"
-                      value={newRdv.code_postal}
-                      onChange={(e) => setNewRdv({...newRdv, code_postal: e.target.value})}
-                      className="w-full border border-gray-300 rounded px-3 py-2"
-                      maxLength="5"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Ville *</label>
-                    <input
-                      type="text"
-                      value={newRdv.ville}
-                      onChange={(e) => setNewRdv({...newRdv, ville: e.target.value})}
-                      className="w-full border border-gray-300 rounded px-3 py-2"
-                      required
-                    />
-                  </div>
-                </div>
+
+                <VilleCodePostalInput
+                  codePostal={newRdv.code_postal}
+                  ville={newRdv.ville}
+                  onCodePostalChange={(value) => setNewRdv({...newRdv, code_postal: value})}
+                  onVilleChange={(value) => setNewRdv({...newRdv, ville: value})}
+                  required
+                />
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                   <input

@@ -1,6 +1,7 @@
 // components/ContratsForm.js
 import React, { useState } from 'react';
 import axios from 'axios';
+import VilleCodePostalInput from './VilleCodePostalInput';
 
 const ContratsForm = () => {
   const [cabinet, setCabinet] = useState('');
@@ -132,46 +133,13 @@ const ContratsForm = () => {
           />
         </div>
 
-        <div className="flex flex-col">
-          <label className="mb-1 font-medium text-gray-700">Code Postal</label>
-          <input
-            type="text"
-            value={codePostal}
-            onChange={async (e) => {
-              const cp = e.target.value;
-              setCodePostal(cp);
-              
-              // Auto-complétion ville si CP valide (5 chiffres)
-              if (cp.length === 5 && /^\d{5}$/.test(cp)) {
-                try {
-                  const response = await fetch(`https://geo.api.gouv.fr/communes?codePostal=${cp}&fields=nom&format=json`);
-                  const data = await response.json();
-                  if (data && data.length > 0) {
-                    setVille(data[0].nom);
-                  }
-                } catch (error) {
-                  console.error("Erreur API Geo:", error);
-                }
-              }
-            }}
-            required
-            disabled={loading}
-            placeholder="75001"
-            className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-100"
-          />
-        </div>
-
-        <div className="flex flex-col">
-          <label className="mb-1 font-medium text-gray-700">Ville</label>
-          <input
-            type="text"
-            value={ville}
-            onChange={e => setVille(e.target.value)}
-            required
-            disabled={loading}
-            className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-100"
-          />
-        </div>
+        <VilleCodePostalInput
+          codePostal={codePostal}
+          ville={ville}
+          onCodePostalChange={setCodePostal}
+          onVilleChange={setVille}
+          required
+        />
 
         <div className="flex flex-col">
           <label className="mb-1 font-medium text-gray-700">
