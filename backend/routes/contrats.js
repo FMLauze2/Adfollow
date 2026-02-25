@@ -223,11 +223,11 @@ router.put('/:id', async (req, res) => {
       values.push(email || null);
     }
     if (date_envoi !== undefined) {
-      updates.push(`date_envoi = $${paramIndex++}`);
+      updates.push(`date_envoi = $${paramIndex++}::date`);
       values.push(date_envoi || null);
     }
     if (date_reception !== undefined) {
-      updates.push(`date_reception = $${paramIndex++}`);
+      updates.push(`date_reception = $${paramIndex++}::date`);
       values.push(date_reception || null);
     }
 
